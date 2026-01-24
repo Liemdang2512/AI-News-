@@ -1,6 +1,6 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 from services.rss_matcher import rss_matcher
 from services.rss_fetcher import rss_fetcher
 from services.categorizer import categorizer
@@ -92,13 +92,16 @@ async def categorize_articles(request: CategorizeRequest):
 
 
 @router.post("/articles/summarize", response_model=SummarizeResponse)
-async def summarize_articles(request: SummarizeRequest):
+async def summarize_articles(
+    request: SummarizeRequest,
+    x_gemini_api_key: Optional[str] = Header(None)
+):
     """
     Fetch article content and generate AI summaries
     Replaces ai_multimodal node in JSON workflow
     """
     try:
-        summary = await summarizer.summarize_articles(request.urls)
+        summary = await summarizer.summarize_articles(request.urls, api_key=x_gemini_api_key)
         return SummarizeResponse(summary=summary)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

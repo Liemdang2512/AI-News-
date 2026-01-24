@@ -10,12 +10,13 @@ class Summarizer:
     Replaces ai_browser + ai_multimodal nodes from JSON workflow
     """
     
-    async def summarize_articles(self, urls: List[str]) -> str:
+    async def summarize_articles(self, urls: List[str], api_key: str = None) -> str:
         """
         Fetch article content and generate summaries using Gemini AI
         
         Args:
             urls: List of article URLs to summarize
+            api_key: Optional custom API key
             
         Returns:
             Formatted markdown summaries
@@ -50,7 +51,8 @@ class Summarizer:
                 prompt=prompt,
                 model_name="gemini-2.0-flash",
                 temperature=0.2,
-                max_tokens=30000
+                max_tokens=30000,
+                api_key=api_key
             )
             return response
         except Exception as e:

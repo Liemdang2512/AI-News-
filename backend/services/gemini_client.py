@@ -10,7 +10,8 @@ class GeminiClient:
         prompt: str,
         model_name: str = "gemini-2.0-flash-exp",
         temperature: float = 0.5,
-        max_tokens: int = 4096
+        max_tokens: int = 4096,
+        api_key: str = None
     ) -> str:
         """
         Generate content using Gemini API
@@ -20,11 +21,19 @@ class GeminiClient:
             model_name: Model to use (gemini-2.0-flash-exp, gemini-1.5-pro, etc.)
             temperature: Sampling temperature (0-1)
             max_tokens: Maximum tokens to generate
+            api_key: Optional custom API key
             
         Returns:
             Generated text response
         """
         try:
+            # If custom API key is provided, configure it
+            if api_key:
+                genai.configure(api_key=api_key)
+            else:
+                # Revert to default key to be safe
+                genai.configure(api_key=settings.GEMINI_API_KEY)
+
             model = genai.GenerativeModel(model_name)
             
             generation_config = genai.GenerationConfig(

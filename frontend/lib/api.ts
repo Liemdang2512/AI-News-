@@ -31,10 +31,15 @@ export const api = {
         return response.json();
     },
 
-    async categorizeArticles(articles_text: string) {
+    async categorizeArticles(articles_text: string, api_key?: string) {
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (api_key) {
+            headers['x-gemini-api-key'] = api_key;
+        }
+
         const response = await fetch(`${API_BASE_URL}/api/articles/categorize`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers,
             body: JSON.stringify({ articles_text }),
         });
 
@@ -45,10 +50,15 @@ export const api = {
         return response.json();
     },
 
-    async summarizeArticles(urls: string[]) {
+    async summarizeArticles(urls: string[], api_key?: string) {
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (api_key) {
+            headers['x-gemini-api-key'] = api_key;
+        }
+
         const response = await fetch(`${API_BASE_URL}/api/articles/summarize`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers,
             body: JSON.stringify({ urls }),
         });
 
