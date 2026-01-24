@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Newspaper, Sparkles, Settings, X, Save } from 'lucide-react';
+import { Newspaper, Sparkles, Key, CheckCircle, Search, FileText, Zap } from 'lucide-react';
 import InputForm from '@/components/InputForm';
 import ArticleList from '@/components/ArticleList';
 import SummaryReport from '@/components/SummaryReport';
@@ -22,18 +22,67 @@ export default function Home() {
         totalArticles: number;
     } | null>(null);
 
+    // Progress tracking: 0=initial, 1=searched, 2=articles loaded, 3=generating summary, 4=complete
+    const [currentProgressStep, setCurrentProgressStep] = useState(0);
+
     // API Key Settings
-    const [showSettings, setShowSettings] = useState(false);
     const [apiKey, setApiKey] = useState('');
+    const [tempApiKey, setTempApiKey] = useState('');
+    const [apiKeySaved, setApiKeySaved] = useState(false);
+    const [showApiConfig, setShowApiConfig] = useState(true); // Show by default, hide after save
 
     useEffect(() => {
         const storedKey = localStorage.getItem('gemini_api_key');
-        if (storedKey) setApiKey(storedKey);
+        if (storedKey) {
+            setApiKey(storedKey);
+            setTempApiKey(storedKey);
+            setApiKeySaved(true);
+            setShowApiConfig(false); // Auto-collapse if key exists
+        }
     }, []);
 
     const handleSaveApiKey = () => {
-        localStorage.setItem('gemini_api_key', apiKey);
-        setShowSettings(false);
+        console.log('=== SAVE API KEY CLICKED ===');
+        console.log('Current tempApiKey:', tempApiKey ? '***' + tempApiKey.slice(-4) : 'EMPTY');
+        console.log('Current apiKey:', apiKey ? '***' + apiKey.slice(-4) : 'EMPTY');
+
+        if (!tempApiKey || tempApiKey.trim() === '') {
+            console.error('API Key is empty!');
+            alert('Vui lòng nhập API Key');
+            return;
+        }
+
+        try {
+            const trimmedKey = tempApiKey.trim();
+            console.log('Trimmed key:', '***' + trimmedKey.slice(-4));
+
+            // Save to localStorage
+            localStorage.setItem('gemini_api_key', trimmedKey);
+            console.log('Saved to localStorage');
+
+            // Verify it was saved
+            const savedKey = localStorage.getItem('gemini_api_key');
+            console.log('Verification - Read from localStorage:', savedKey ? '***' + savedKey.slice(-4) : 'NOT FOUND');
+
+            if (savedKey !== trimmedKey) {
+                throw new Error('localStorage verification failed!');
+            }
+
+            // Update state
+            setApiKey(trimmedKey);
+            setApiKeySaved(true);
+            console.log('State updated successfully');
+            console.log('=== SAVE COMPLETE ===');
+
+            // Collapse the API config section after save
+            setTimeout(() => {
+                setShowApiConfig(false);
+                setApiKeySaved(false);
+            }, 1500);
+        } catch (error) {
+            console.error('Failed to save API key:', error);
+            alert('Không thể lưu API Key. Vui lòng thử lại.\nLỗi: ' + error);
+        }
     };
 
     const handleSearch = async (data: { newspapers: string; date: string; timeRange: string }) => {
@@ -42,19 +91,19 @@ export default function Home() {
         setArticles([]);
         setSummary('');
         setSearchMetadata(null);
+        setCurrentProgressStep(1); // Step 1: Searching
 
         try {
-            // Step 1: Match RSS feeds
             setCurrentStep('Đang khớp nguồn RSS...');
             const matchResponse = await api.matchRSS(data.newspapers);
 
             if (matchResponse.rss_feeds.length === 0) {
                 setError('Không tìm thấy nguồn RSS phù hợp. Vui lòng kiểm tra tên các đầu báo.');
                 setLoading(false);
+                setCurrentProgressStep(0);
                 return;
             }
 
-            // Step 2: Fetch and filter articles
             setCurrentStep('Đang tải và lọc bài viết...');
             const fetchResponse = await api.fetchArticles(
                 matchResponse.rss_feeds,
@@ -68,6 +117,7 @@ export default function Home() {
                 timeRange: data.timeRange,
                 totalArticles: fetchResponse.articles.length
             });
+            setCurrentProgressStep(2); // Step 2: Articles loaded
             setLoading(false);
             setCurrentStep('');
 
@@ -75,6 +125,7 @@ export default function Home() {
             setError(err instanceof Error ? err.message : 'Đã xảy ra lỗi không xác định');
             setLoading(false);
             setCurrentStep('');
+            setCurrentProgressStep(0);
         }
     };
 
@@ -82,26 +133,37 @@ export default function Home() {
         setLoading(true);
         setError('');
         setSummary('');
+        setCurrentProgressStep(3); // Step 3: Generating summary
 
         try {
             setCurrentStep('Đang tóm tắt bài viết...');
-            // Pass the API key to the summarize function
-            const response = await api.summarizeArticles(urls, apiKey);
+            console.log('Summarizing with API Key:', apiKey ? '***' + apiKey.slice(-4) : 'No API key');
+
+            // Find the full article objects for the selected URLs
+            const selectedArticles = articles.filter(article => urls.includes(article.url));
+
+            
+            // Update metadata with selected count
+            if (searchMetadata) {
+                setSearchMetadata({ ...searchMetadata, totalArticles: selectedArticles.length });
+            }
+            const response = await api.summarizeArticles(urls, apiKey, selectedArticles);
             setSummary(response.summary);
+            setCurrentProgressStep(4); // Step 4: Complete
             setLoading(false);
             setCurrentStep('');
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Đã xảy ra lỗi khi tóm tắt');
             setLoading(false);
             setCurrentStep('');
+            setCurrentProgressStep(2);
         }
     };
 
     const handleBackFromSummary = () => {
-        setSummary(''); // Clear summary to return to article list
+        setSummary('');
     };
 
-    // If we have a summary, show the full-page report
     if (summary && !loading) {
         return (
             <SummaryReport
@@ -113,83 +175,173 @@ export default function Home() {
     }
 
     return (
-        <div className="min-h-screen bg-slate-50 flex flex-col relative">
-            {/* Settings Modal */}
-            {showSettings && (
-                <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl p-6 animate-scale-up">
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                                <Settings className="w-5 h-5 text-slate-500" />
-                                Cài đặt API Key
-                            </h3>
-                            <button onClick={() => setShowSettings(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
-                        <div className="space-y-4">
-                            <p className="text-sm text-slate-600">
-                                Nhập Google Gemini API Key của bạn để sử dụng các tính năng cao cấp mà không bị giới hạn.
-                                <br />
-                                <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                                    Lấy API Key tại đây &rarr;
-                                </a>
-                            </p>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">API Key</label>
-                                <input
-                                    type="password"
-                                    value={apiKey}
-                                    onChange={(e) => setApiKey(e.target.value)}
-                                    placeholder="AIzaSy..."
-                                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                                />
-                            </div>
-                            <div className="flex justify-end pt-2">
-                                <button
-                                    onClick={handleSaveApiKey}
-                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 font-medium"
-                                >
-                                    <Save className="w-4 h-4" />
-                                    Lưu cài đặt
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
+        <div className="min-h-screen bg-slate-50 flex flex-col">
             {/* Header */}
-            <header className="bg-[#1e3a5f] text-white shadow-md sticky top-0 z-50">
-                <div className="max-w-7xl mx-auto px-6 lg:px-12 py-4 flex items-center justify-between">
+            <header className="bg-navy-darkest text-white shadow-md sticky top-0 z-50">
+                <div className="max-w-7xl mx-auto px-6 lg:px-12 py-4 flex items-center justify-center">
                     <div className="flex items-center gap-3">
                         <div className="w-8 h-8 bg-white rounded flex items-center justify-center">
-                            <Newspaper className="w-5 h-5 text-[#1e3a5f]" />
+                            <Newspaper className="w-5 h-5 text-navy-darkest" />
                         </div>
                         <h1 className="text-white text-lg font-bold">AI News Assistant</h1>
                     </div>
-                    <button
-                        onClick={() => setShowSettings(true)}
-                        className="p-2 bg-white/10 hover:bg-white/20 rounded-lg transition-all text-white/90 hover:text-white"
-                        title="Cài đặt API"
-                    >
-                        <Settings className="w-5 h-5" />
-                    </button>
                 </div>
             </header>
 
             {/* Main Content */}
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6 w-full flex-1">
-                {/* Intelligence Search Section */}
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8">
-                    <h2 className="text-2xl font-bold text-slate-800 mb-2">Intelligence Search</h2>
-                    <p className="text-slate-500 text-sm mb-6">
-                        Tìm kiếm và phân tích tin tức từ các nguồn báo chính thống
-                    </p>
+                {/* API Configuration Section - Collapsible */}
+                <div className="bg-white rounded-xl shadow-sm border border-blue-200 p-6">
+                    {!showApiConfig && apiKey ? (
+                        // Collapsed view - Show compact banner
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                                    <CheckCircle className="w-5 h-5 text-green-600" />
+                                </div>
+                                <div>
+                                    <h3 className="text-sm font-semibold text-slate-800">Đã cấu hình API Key</h3>
+                                    <p className="text-xs text-slate-500">Key: •••{apiKey.slice(-4)}</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setShowApiConfig(true)}
+                                className="px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors font-medium"
+                            >
+                                Chỉnh sửa
+                            </button>
+                        </div>
+                    ) : (
+                        // Expanded view - Full configuration
+                        <>
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                                    <Key className="w-5 h-5 text-blue-600" />
+                                </div>
+                                <div>
+                                    <h2 className="text-lg font-bold text-slate-800">Cấu hình API</h2>
+                                    <p className="text-sm text-slate-500">
+                                        Nhập API key của bạn để kích hoạt tính năng tổng hợp tin tức và tóm tắt bằng AI.
+                                    </p>
+                                </div>
+                            </div>
 
-                    {/* Input Form */}
-                    <InputForm onSubmit={handleSearch} loading={loading} />
+                            <div className="space-y-3">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                                        API KEY
+                                    </label>
+                                    <div className="flex gap-3">
+                                        <div className="flex-1 relative">
+                                            <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                                                <Key className="w-4 h-4 text-slate-400" />
+                                            </div>
+                                            <input
+                                                type="password"
+                                                value={tempApiKey}
+                                                onChange={(e) => setTempApiKey(e.target.value)}
+                                                placeholder="sk-••••••••••••••••••••"
+                                                className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                                            />
+                                        </div>
+                                        <button
+                                            onClick={handleSaveApiKey}
+                                            className={`px-6 py-2.5 rounded-lg transition-all font-medium flex items-center gap-2 ${apiKeySaved
+                                                ? 'bg-green-600 text-white'
+                                                : 'bg-blue-600 text-white hover:bg-blue-700'
+                                                }`}
+                                        >
+                                            {apiKeySaved ? (
+                                                <>
+                                                    <CheckCircle className="w-4 h-4" />
+                                                    Saved!
+                                                </>
+                                            ) : (
+                                                'Lưu Key'
+                                            )}
+                                        </button>
+                                    </div>
+                                </div>
+                                {apiKey && (
+                                    <div className="flex items-center gap-2 text-sm text-green-600">
+                                        <CheckCircle className="w-4 h-4" />
+                                        <span>API Key đã lưu: •••{apiKey.slice(-4)}</span>
+                                    </div>
+                                )}
+                                <a
+                                    href="https://aistudio.google.com/app/apikey"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 font-medium"
+                                >
+                                    <span className="w-4 h-4 bg-blue-100 rounded-full flex items-center justify-center text-xs">?</span>
+                                    Hướng dẫn lấy API Key?
+                                </a>
+                            </div>
+                        </>
+                    )}
                 </div>
+
+                {/* Progress Stepper */}
+                {currentProgressStep > 0 && (
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                        <div className="flex items-center justify-between max-w-4xl mx-auto">
+                            {/* Step 1: Search */}
+                            <div className="flex flex-col items-center flex-1">
+                                <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-2 transition-all ${currentProgressStep >= 1 ? 'bg-navy-dark text-white' : 'bg-slate-200 text-slate-400'
+                                    }`}>
+                                    {currentProgressStep > 1 ? (
+                                        <CheckCircle className="w-6 h-6" />
+                                    ) : (
+                                        <Search className="w-6 h-6" />
+                                    )}
+                                </div>
+                                <p className={`text-sm font-medium ${currentProgressStep >= 1 ? 'text-slate-800' : 'text-slate-400'}`}>
+                                    1. Tìm kiếm & Lọc
+                                </p>
+                            </div>
+
+                            {/* Connector Line */}
+                            <div className={`h-1 flex-1 mx-2 ${currentProgressStep >= 2 ? 'bg-navy-dark' : 'bg-slate-200'}`}></div>
+
+                            {/* Step 2: Select */}
+                            <div className="flex flex-col items-center flex-1">
+                                <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-2 transition-all ${currentProgressStep >= 2 ? 'bg-navy-dark text-white' : 'bg-slate-200 text-slate-400'
+                                    }`}>
+                                    {currentProgressStep > 2 ? (
+                                        <CheckCircle className="w-6 h-6" />
+                                    ) : (
+                                        <FileText className="w-6 h-6" />
+                                    )}
+                                </div>
+                                <p className={`text-sm font-medium ${currentProgressStep >= 2 ? 'text-slate-800' : 'text-slate-400'}`}>
+                                    2. Chọn bài viết
+                                </p>
+                            </div>
+
+                            {/* Connector Line */}
+                            <div className={`h-1 flex-1 mx-2 ${currentProgressStep >= 3 ? 'bg-navy-dark' : 'bg-slate-200'}`}></div>
+
+                            {/* Step 3: Generate */}
+                            <div className="flex flex-col items-center flex-1">
+                                <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-2 transition-all ${currentProgressStep >= 3 ? (currentProgressStep === 3 ? 'bg-navy-dark text-white animate-pulse' : 'bg-navy-dark text-white') : 'bg-slate-200 text-slate-400'
+                                    }`}>
+                                    {currentProgressStep > 3 ? (
+                                        <CheckCircle className="w-6 h-6" />
+                                    ) : (
+                                        <Zap className="w-6 h-6" />
+                                    )}
+                                </div>
+                                <p className={`text-sm font-medium ${currentProgressStep >= 3 ? 'text-slate-800' : 'text-slate-400'}`}>
+                                    3. Tạo tóm tắt
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Form tìm kiếm */}
+                <InputForm onSubmit={handleSearch} loading={loading} />
 
                 {/* Error Message */}
                 {error && (
@@ -247,9 +399,6 @@ export default function Home() {
                     <div className="flex items-center gap-2 text-slate-400">
                         <Newspaper className="w-5 h-5" />
                         <span className="text-sm font-medium">© 2024 AI News Assistant. All rights reserved.</span>
-                    </div>
-                    <div className="flex gap-6">
-                        <span className="text-slate-500 text-sm">Powered by Google Gemini AI</span>
                     </div>
                 </div>
             </footer>

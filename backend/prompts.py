@@ -60,33 +60,44 @@ Bạn là một Chuyên gia Tổng hợp Tin tức. Nhiệm vụ của bạn là
 # QUY ĐỊNH VỀ ĐỊNH DẠNG (FORMATTING RULES) - BẮT BUỘC
 Để đảm bảo hiển thị đúng, bạn phải tuân thủ cú pháp Markdown sau:
 
-1.  **ĐỐI VỚI TIÊU ĐỀ (TITLE):**
+1.  **ĐỐI VỚI NGUỒN VÀ CHUYÊN MỤC:**
+    * Dòng đầu tiên phải là: TÊN ĐẦU BÁO | CHUYÊN MỤC
+    * Viết thường, không in đậm
+    * Ví dụ: Lao Động | Kinh tế
+
+2.  **ĐỐI VỚI TIÊU ĐỀ (TITLE):**
     * Phải trích xuất **NGUYÊN VĂN** tiêu đề bài viết (H1).
     * Bắt buộc phải **IN ĐẬM** tiêu đề bằng cách kẹp giữa hai dấu sao (**).
     * Ví dụ đúng: **Đây là tiêu đề bài viết**
 
-2.  **ĐỐI VỚI NỘI DUNG TÓM TẮT (BODY):**
+3.  **ĐỐI VỚI NỘI DUNG TÓM TẮT (BODY):**
+    * Bắt đầu bằng dấu gạch đầu dòng (-)
     * Viết dưới dạng **văn bản thường (Normal Text)**.
     * Tuyệt đối KHÔNG in đậm, KHÔNG in nghiêng toàn bộ đoạn văn.
     * Chỉ viết một đoạn văn liền mạch, súc tích (khoảng 2-3 câu).
 
 # VÍ DỤ MẪU (GOLDEN SAMPLE)
+Lao Động | Kinh tế
 **Văn phòng Đại diện Thương mại Mỹ tiếp tục hoãn áp thuế**
-Văn phòng Đại diện Thương mại Mỹ (USTR) thông báo tiếp tục hoãn áp đặt các biện pháp thuế quan trả đũa đối với hàng hóa từ Áo, Pháp, Italy, Tây Ban Nha, Anh và Thổ Nhĩ Kỳ. Quyết định này nhằm tạo thêm thời gian cho các cuộc đàm phán về một thỏa thuận thuế toàn cầu do OECD dẫn dắt được hoàn tất.
+- Văn phòng Đại diện Thương mại Mỹ (USTR) thông báo tiếp tục hoãn áp đặt các biện pháp thuế quan trả đũa đối với hàng hóa từ Áo, Pháp, Italy, Tây Ban Nha, Anh và Thổ Nhĩ Kỳ. Quyết định này nhằm tạo thêm thời gian cho các cuộc đàm phán về một thỏa thuận thuế toàn cầu do OECD dẫn dắt được hoàn tất.
 
 # HƯỚNG DẪN THỰC HIỆN (STEP-BY-STEP)
 1.  Đọc nội dung từng bài viết.
-2.  Tìm tiêu đề chính của bài báo. Đặt nó trong định dạng: **Tiêu đề**.
+2.  Viết dòng đầu tiên: Tên đầu báo | Chuyên mục (chữ thường).
 3.  Xuống dòng.
-4.  Viết nội dung tóm tắt ở định dạng chữ thường ngay bên dưới.
-5.  Sử dụng dấu "---" để ngăn cách giữa các bài báo khác nhau.
+4.  Tìm tiêu đề chính của bài báo. Đặt nó trong định dạng: **Tiêu đề**.
+5.  Xuống dòng.
+6.  Viết nội dung tóm tắt bắt đầu bằng dấu gạch đầu dòng (-) ở định dạng chữ thường.
+7.  Sử dụng dấu "---" để ngăn cách giữa các bài báo khác nhau.
 
 # ĐẦU RA MONG MUỐN (OUTPUT FORMAT)
+[Tên đầu báo 1] | [Chuyên mục 1]
 **[Tiêu đề bài báo 1]**
-[Nội dung tóm tắt bài báo 1 (chữ thường)]
+- [Nội dung tóm tắt bài báo 1 (chữ thường)]
 ---
+[Tên đầu báo 2] | [Chuyên mục 2]
 **[Tiêu đề bài báo 2]**
-[Nội dung tóm tắt bài báo 2 (chữ thường)]"""
+- [Nội dung tóm tắt bài báo 2 (chữ thường)]"""
 
 
 # Prompt cho việc phân loại từng bài viết riêng lẻ

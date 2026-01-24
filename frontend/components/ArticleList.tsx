@@ -85,13 +85,8 @@ export default function ArticleList({ articles, onSelectArticles }: ArticleListP
             {/* Header */}
             <div className="flex items-center justify-between pb-4 border-b border-slate-200">
                 <h2 className="text-lg font-bold text-slate-800">
-                    Candidate List
+                    Danh sách bài viết
                 </h2>
-                <div className="flex items-center gap-3">
-                    <span className="text-sm text-slate-500">
-                        Sort by: <span className="font-medium text-slate-700">Newest</span>
-                    </span>
-                </div>
             </div>
 
             {/* Selection Actions */}
@@ -114,7 +109,7 @@ export default function ArticleList({ articles, onSelectArticles }: ArticleListP
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                         </svg>
-                        Tạo báo cáo thống minh
+                        Tóm tắt bài viết đã chọn
                     </button>
                 </div>
             </div>

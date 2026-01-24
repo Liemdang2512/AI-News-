@@ -2,6 +2,8 @@
 
 import { Download, Share2, Calendar, Clock } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import { Document, Paragraph, TextRun, HeadingLevel, AlignmentType, Packer } from 'docx';
+import { saveAs } from 'file-saver';
 
 interface SummaryReportProps {
     summary: string;
@@ -14,17 +16,91 @@ interface SummaryReportProps {
 }
 
 export default function SummaryReport({ summary, metadata, onBack }: SummaryReportProps) {
-    const handleDownload = () => {
-        // Create a Blob with the summary content
-        const blob = new Blob([summary], { type: 'text/plain;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `ban-tin-thong-minh-${new Date().toISOString().split('T')[0]}.txt`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
+    const handleDownload = async () => {
+        try {
+            const lines = summary.split('\n');
+            const paragraphs: Paragraph[] = [];
+
+            // Add title
+            paragraphs.push(
+                new Paragraph({
+                    text: 'Bản tóm tắt các bài báo',
+                    heading: HeadingLevel.TITLE,
+                    alignment: AlignmentType.CENTER,
+                    spacing: { after: 200 },
+                })
+            );
+
+            // Add metadata
+            if (metadata?.date) {
+                paragraphs.push(
+                    new Paragraph({
+                        children: [new TextRun({ text: `Ngày: ${metadata.date}`, size: 20 })],
+                        spacing: { after: 100 },
+                    })
+                );
+            }
+
+            if (metadata?.timeRange) {
+                paragraphs.push(
+                    new Paragraph({
+                        children: [new TextRun({ text: `Khung giờ: ${metadata.timeRange}`, size: 20 })],
+                        spacing: { after: 100 },
+                    })
+                );
+            }
+
+            if (metadata?.totalArticles) {
+                paragraphs.push(
+                    new Paragraph({
+                        children: [new TextRun({ text: `Tóm tắt từ ${metadata.totalArticles} bài viết`, size: 20 })],
+                        spacing: { after: 300 },
+                    })
+                );
+            }
+
+            // Process content
+            for (const line of lines) {
+                const trimmed = line.trim();
+                if (!trimmed) {
+                    paragraphs.push(new Paragraph({ text: '', spacing: { after: 100 } }));
+                } else if (trimmed === '---') {
+                    paragraphs.push(new Paragraph({ text: '', spacing: { after: 200 } }));
+                } else if (trimmed.includes('|')) {
+                    // Source | Category
+                    paragraphs.push(
+                        new Paragraph({
+                            children: [new TextRun({ text: trimmed, size: 20, color: '666666', italics: true })],
+                            spacing: { before: 200, after: 100 },
+                        })
+                    );
+                } else if (trimmed.startsWith('**') && trimmed.endsWith('**')) {
+                    // Bold title
+                    const title = trimmed.replace(/\*\*/g, '');
+                    paragraphs.push(
+                        new Paragraph({
+                            children: [new TextRun({ text: title, bold: true, size: 24 })],
+                            spacing: { after: 100 },
+                        })
+                    );
+                } else {
+                    // Regular text
+                    paragraphs.push(
+                        new Paragraph({
+                            children: [new TextRun({ text: trimmed, size: 22 })],
+                            spacing: { after: 150 },
+                        })
+                    );
+                }
+            }
+
+            const doc = new Document({ sections: [{ properties: {}, children: paragraphs }] });
+            const blob = await Packer.toBlob(doc);
+            saveAs(blob, `ban-tin-thong-minh-${new Date().toISOString().split('T')[0]}.docx`);
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Không thể tạo file Word. Vui lòng thử lại.');
+        }
     };
 
     const handleShare = () => {
@@ -62,11 +138,11 @@ export default function SummaryReport({ summary, metadata, onBack }: SummaryRepo
                         <div>
                             <div className="flex items-center gap-2 mb-3">
                                 <span className="text-xs font-semibold text-vibrant-blue uppercase tracking-wider">
-                                    ✨ AI GENERATED REPORT
+                                    Bản tóm tắt các bài báo
                                 </span>
                             </div>
                             <h1 className="text-3xl font-bold text-corporate-blue-text mb-4">
-                                BẢN TIN THÔNG MINH
+                                Bản tóm tắt các bài báo
                             </h1>
 
                             {/* Metadata */}
@@ -86,16 +162,10 @@ export default function SummaryReport({ summary, metadata, onBack }: SummaryRepo
                                 {metadata?.totalArticles && (
                                     <div className="flex items-center gap-2">
                                         <span className="text-vibrant-blue">📰</span>
-                                        <span>Tổng hợp từ {metadata.totalArticles} bài viết</span>
+                                        <span>Tóm tắt từ {metadata.totalArticles} bài viết</span>
                                     </div>
                                 )}
                             </div>
-                        </div>
-
-                        <div className="flex items-center gap-3">
-                            <span className="px-4 py-2 bg-blue-50 text-vibrant-blue text-sm font-semibold rounded-lg">
-                                Morning Briefing
-                            </span>
                         </div>
                     </div>
 

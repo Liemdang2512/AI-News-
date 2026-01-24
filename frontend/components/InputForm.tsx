@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Search, X, ChevronDown, Check } from 'lucide-react';
 
 interface InputFormProps {
@@ -21,6 +21,7 @@ const availableNewspapers = [
 export default function InputForm({ onSubmit, loading }: InputFormProps) {
     const [selectedNewspapers, setSelectedNewspapers] = useState<string[]>(['Lao Động', 'Dân Trí', 'VTV']);
     const [showDropdown, setShowDropdown] = useState(false);
+    const dropdownRef = useRef<HTMLDivElement>(null);
     const [date, setDate] = useState(() => {
         const today = new Date();
         const day = String(today.getDate()).padStart(2, '0');
@@ -37,6 +38,23 @@ export default function InputForm({ onSubmit, loading }: InputFormProps) {
         '14h00 đến 17h00',
         '17h00 đến 21h00',
     ];
+
+    // Click outside to close dropdown
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setShowDropdown(false);
+            }
+        };
+
+        if (showDropdown) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [showDropdown]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -68,20 +86,10 @@ export default function InputForm({ onSubmit, loading }: InputFormProps) {
     return (
         <div className="bg-white rounded-2xl shadow-soft p-6 lg:p-8 border border-slate-100 transition-all duration-300 hover:shadow-lg">
             <div className="space-y-6">
-                {/* Title */}
-                <div className="max-w-2xl">
-                    <h1 className="text-corporate-blue-text text-2xl lg:text-3xl font-bold tracking-tight mb-2">
-                        Intelligence Search
-                    </h1>
-                    <p className="text-slate-500 text-sm lg:text-base">
-                        Filter by source, time range, and specific keywords to generate your executive briefing.
-                    </p>
-                </div>
-
                 {/* Search Bar Row */}
                 <form onSubmit={handleSubmit}>
                     <div className="flex flex-col md:flex-row gap-4">
-                        <div className="flex-1 relative">
+                        <div className="flex-1 relative" ref={dropdownRef}>
                             {/* Search Input with Dropdown */}
                             <div className="relative group">
                                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none z-10">

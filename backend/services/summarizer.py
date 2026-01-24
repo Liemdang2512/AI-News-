@@ -10,17 +10,20 @@ class Summarizer:
     Replaces ai_browser + ai_multimodal nodes from JSON workflow
     """
     
-    async def summarize_articles(self, urls: List[str], api_key: str = None) -> str:
+    async def summarize_articles(self, urls: List[str], api_key: str = None, articles_metadata: dict = None) -> str:
         """
         Fetch article content and generate summaries using Gemini AI
         
         Args:
             urls: List of article URLs to summarize
             api_key: Optional custom API key
+            articles_metadata: Optional dict mapping URL to {source, category}
             
         Returns:
             Formatted markdown summaries
         """
+        if articles_metadata is None:
+            articles_metadata = {}
         # Fetch all article contents
         articles_data = []
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
@@ -28,9 +31,15 @@ class Summarizer:
                 try:
                     response = await client.get(url)
                     content = self._extract_content(response.text)
+                    
+                    # Get metadata for this URL
+                    metadata = articles_metadata.get(url, {})
+                    
                     articles_data.append({
                         "url": url,
-                        "content": content
+                        "content": content,
+                        "source": metadata.get('source', 'Không rõ'),
+                        "category": metadata.get('category', 'Không rõ')
                     })
                 except Exception as e:
                     print(f"Error fetching {url}: {str(e)}")
@@ -41,6 +50,8 @@ class Summarizer:
         for i, article in enumerate(articles_data, 1):
             articles_content += f"\n\n--- BÀI VIẾT {i} ---\n"
             articles_content += f"URL: {article['url']}\n"
+            articles_content += f"NGUỒN: {article.get('source', 'Không rõ')}\n"
+            articles_content += f"CHUYÊN MỤC: {article.get('category', 'Không rõ')}\n"
             articles_content += f"NỘI DUNG:\n{article['content']}\n"
         
         # Load prompt from prompts.py and insert content

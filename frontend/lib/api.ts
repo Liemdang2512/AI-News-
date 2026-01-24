@@ -50,7 +50,7 @@ export const api = {
         return response.json();
     },
 
-    async summarizeArticles(urls: string[], api_key?: string) {
+    async summarizeArticles(urls: string[], api_key?: string, articles?: any[]) {
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
         if (api_key) {
             headers['x-gemini-api-key'] = api_key;
@@ -59,7 +59,7 @@ export const api = {
         const response = await fetch(`${API_BASE_URL}/api/articles/summarize`, {
             method: 'POST',
             headers,
-            body: JSON.stringify({ urls }),
+            body: JSON.stringify({ urls, articles: articles || [] }),
         });
 
         if (!response.ok) {

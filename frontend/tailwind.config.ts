@@ -9,12 +9,20 @@ const config: Config = {
     theme: {
         extend: {
             colors: {
-                primary: "#4444cf",
-                "corporate-navy": "#071E55",
-                "corporate-blue-text": "#143074",
-                "vibrant-blue": "#3868D9",
+                // New blue palette
+                'navy-darkest': '#021024',
+                'navy-dark': '#052659',
+                'blue-medium': '#5483B3',
+                'blue-light': '#7DA0CA',
+                'blue-lightest': '#C1E8FF',
+
+                // Legacy color mappings (for compatibility)
+                primary: "#5483B3",
+                "corporate-navy": "#021024",
+                "corporate-blue-text": "#052659",
+                "vibrant-blue": "#5483B3",
                 "background-light": "#f6f6f8",
-                "background-dark": "#13131f",
+                "background-dark": "#021024",
             },
             fontFamily: {
                 display: ["Inter", "sans-serif"],
@@ -29,7 +37,7 @@ const config: Config = {
             },
             boxShadow: {
                 soft: "0 4px 20px -2px rgba(0, 0, 0, 0.05)",
-                glow: "0 0 15px rgba(56, 104, 217, 0.3)",
+                glow: "0 0 15px rgba(84, 131, 179, 0.3)",
             },
             animation: {
                 'fade-in': 'fadeIn 0.5s ease-in-out',

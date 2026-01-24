@@ -41,6 +41,7 @@ class CategorizeResponse(BaseModel):
 
 class SummarizeRequest(BaseModel):
     urls: List[str]
+    articles: List[Article] = []  # Optional: full article objects with source and category
 
 class SummarizeResponse(BaseModel):
     summary: str
@@ -101,7 +102,20 @@ async def summarize_articles(
     Replaces ai_multimodal node in JSON workflow
     """
     try:
-        summary = await summarizer.summarize_articles(request.urls, api_key=x_gemini_api_key)
+        # Pass article metadata if available
+        articles_metadata = {}
+        if request.articles:
+            for article in request.articles:
+                articles_metadata[article.url] = {
+                    'source': article.source,
+                    'category': article.category
+                }
+        
+        summary = await summarizer.summarize_articles(
+            request.urls, 
+            api_key=x_gemini_api_key,
+            articles_metadata=articles_metadata
+        )
         return SummarizeResponse(summary=summary)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
