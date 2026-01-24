@@ -212,6 +212,7 @@ export default function ArticleList({ articles, onSelectArticles }: ArticleListP
                                                     src={article.thumbnail}
                                                     alt={article.title}
                                                     className="w-full h-full object-cover"
+                                                    referrerPolicy="no-referrer"
                                                     onError={(e) => {
                                                         e.currentTarget.style.display = 'none';
                                                     }}
