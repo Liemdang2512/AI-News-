@@ -1,0 +1,156 @@
+{
+  "action": [
+    {
+      "label": "Nhập tên các đầu báo hiện có Lao Động, Dân Trí, VTV,  Hà Nội Mới, Sài Gòn Giải Phóng , VietnamPlus , Tiền Phong",
+      "action": "input",
+      "target": "text",
+      "variable": "url",
+      "option": "",
+      "_id": "@o;x/[RUr~X=^*s}K]%c"
+    },
+    {
+      "label": "Ngày hiện tại",
+      "action": "input",
+      "target": "text",
+      "variable": "date",
+      "option": "",
+      "_id": "CL{U%U(g0kTto!?u;67e"
+    },
+    {
+      "label": "Khoảng thời gian",
+      "action": "input",
+      "target": "option",
+      "variable": "time",
+      "option": "6h00 đến 8h00, 8h00 đến 11h00,  11h00 đến 14h00, 14h00 đến 17h00, 17h00 đến 21h00",
+      "_id": "|6{[EdE?yMH;-ZR#sLxs"
+    },
+    {
+      "label": "",
+      "action": "ai_llm",
+      "target": "# 1. ROLE (VAI TRÒ)\nBạn là một **RSS Data Matcher** (Bộ khớp dữ liệu RSS). Nhiệm vụ của bạn là nhận danh sách từ khóa đầu vào từ biến `memory.url`, đối chiếu với kho dữ liệu `tonghoprss` và trích xuất ra các liên kết khớp chính xác.\n\n# 2. INPUT (DỮ LIỆU ĐẦU VÀO)\n\n**A. Biến `tonghoprss` (Kho dữ liệu nguồn cố định):**\n[\n  \"https://laodong.vn/rss/thoi-su.rss\",\n  \"https://laodong.vn/rss/the-gioi.rss\",\n  \"https://laodong.vn/rss/xa-hoi.rss\",\n  \"https://laodong.vn/rss/kinh-doanh.rss\",\n  \"https://laodong.vn/rss/phap-luat.rss\",\n  \"https://dantri.com.vn/rss/phap-luat.rss\",\n  \"https://dantri.com.vn/rss/kinh-doanh.rss\",\n  \"https://dantri.com.vn/rss/doi-song.rss\",\n  \"https://dantri.com.vn/rss/the-gioi.rss\",\n  \"https://vtv.vn/rss/xa-hoi.rss\",\n  \"https://vtv.vn/rss/phap-luat.rss\",\n  \"https://vtv.vn/rss/the-gioi.rss\",\n  \"https://vtv.vn/rss/kinh-te.rss\",\n  \"https://hanoimoi.vn/rss/xa-hoi\",\n  \"https://hanoimoi.vn/rss/the-gioi\",\n  \"https://hanoimoi.vn/rss/phap-luat\",\n  \"https://hanoimoi.vn/rss/kinh-te\",\n  \"https://www.sggp.org.vn/rss/xahoi-199.rss\",\n  \"https://www.sggp.org.vn/rss/phapluat-112.rss\",\n  \"https://www.sggp.org.vn/rss/kinhte-89.rss\",\n  \"https://www.sggp.org.vn/rss/thegioi-143.rss\",\n  \"https://www.vietnamplus.vn/rss/kinhte-311.rss\",\n  \"https://www.vietnamplus.vn/rss/thegioi-209.rss\",\n  \"https://www.vietnamplus.vn/rss/xahoi/phapluat-327.rss\",\n  \"https://www.vietnamplus.vn/rss/xahoi-314.rss\"\n  \"https://tienphong.vn/rss/xa-hoi-2.rss\",\n  \"https://tienphong.vn/rss/kinh-te-3.rss\",\n  \"https://tienphong.vn/rss/the-gioi-5.rss\",\n  \"https://tienphong.vn/rss/phap-luat-12.rss\",\n]\n\n**B. Biến `memory.url` (Yêu cầu lọc từ người dùng):**\n{GÁN_GIÁ_TRỊ_BIẾN_MEMORY_URL_VÀO_ĐÂY}\n\n# 3. STEPS (QUY TRÌNH THỰC HIỆN)\n1.  Đọc các domain có trong biến `memory.url`.\n2.  Quét toàn bộ danh sách `tonghoprss`.\n3.  Lọc: Nếu một link trong `tonghoprss` chứa chuỗi domain trong `memory.url` -> Giữ lại.\n4.  Gom tất cả kết quả vào một mảng.\n\n# 4. EXPORT (QUAN TRỌNG - BẮT BUỘC TUÂN THỦ)\n* Chỉ trả về **RAW TEXT** (Văn bản thô).\n* **TUYỆT ĐỐI KHÔNG** sử dụng dấu backticks (```) hoặc định dạng code block (```json).\n* **TUYỆT ĐỐI KHÔNG** thêm bất kỳ lời dẫn, tiêu đề hay khoảng trắng thừa nào.\n* Bắt đầu ngay bằng ký tự `[` và kết thúc bằng `]`.\n\nVí dụ đúng:\n[\"https://a.com/rss1\",\"https://b.com/rss2\"]",
+      "variable": "rss",
+      "option": "{\"model\":\"gemini-2.0-flash\",\"temperature\":0.5,\"max_tokens\":4096,\"json_output\":true,\"local\":false}",
+      "_id": "0T.j+w+)16__d[3?p%AI"
+    },
+    {
+      "label": "",
+      "action": "output",
+      "target": "canvas",
+      "variable": " memory.rss",
+      "option": "",
+      "_id": "tvOM59G*83,@.cD8dZle"
+    },
+    {
+      "label": "",
+      "action": "each",
+      "target": "memory.rss",
+      "variable": " memory.bien",
+      "option": "",
+      "_id": "r@f9wQBZzw2!hN{.u4s@"
+    },
+    {
+      "label": "",
+      "action": "ai_browser",
+      "target": "wait 2 sec\ngo to memory.bien\n",
+      "variable": " memory.bien",
+      "option": "{\"model\":\"gemini-3-pro-preview\",\"temperature\":0.7,\"max_tokens\":4096,\"json_output\":false,\"local\":false}",
+      "_id": ")zP_Z/boUgtqbbO|UY!H"
+    },
+    {
+      "label": "",
+      "action": "wait",
+      "target": "",
+      "variable": "2000",
+      "option": "",
+      "_id": "E~GzFPcg=pfzcz+3MfB}"
+    },
+    {
+      "label": "",
+      "action": "extract",
+      "target": "body",
+      "variable": "noidung",
+      "option": "",
+      "_id": "s+40ZGhBD;_Q:-;g!;`K"
+    },
+    {
+      "label": "",
+      "action": "ai_llm",
+      "target": "**[ROLE]**\nYou are a High-Precision Data Extraction and Filtering API. Your mission is to parse raw XML/RSS files, identify time systems, and filter articles based on strict mathematical comparisons. You operate as a machine: no chatter, no fabrications, and no bold formatting (**).\n\n**[INPUT]**\n- Source Data (XML/RSS): {{memory.noidung}}\n- Target Date: {{memory.date}} (Format: DD/MM/YYYY)\n- Target Time Range: {{memory.time}} (Format: \"HH:mm to HH:mm\")\n\n**[STEPS]**\n1. **Identify Category:** Extract the text within the `<channel><title>` tag. This is the \"Category Name\".\n2. **Digitize Target Range:** Convert {{memory.time}} into two 4-digit integers (e.g., \"11h00 đến 14h00\" -> Start: 1100, End: 1400).\n3. **Internal Self-Audit (Mandatory):** For every `<item>`, you MUST perform this internal calculation before deciding to include it:\n   - **A. Time Extraction:** Extract HH:mm from `<pubDate>`. Ignore seconds (:ss).\n   - **B. 24h Normalization:**\n     - If \"PM/chiều/tối\" and Hour < 12: Hour + 12.\n     - If \"AM/sáng\" and Hour = 12: Hour = 00.\n     - Convert result to a 4-digit integer (e.g., 2:34 PM -> 1434; 08:46 -> 0846).\n   - **C. Boolean Logic Check:**\n     - Match Date: Does article date == {{memory.date}}?\n     - Match Time: Is (Article_Integer >= Start_Integer) AND (Article_Integer <= End_Integer)?\n   - **D. Execution:** If any condition in Step C is FALSE, you MUST DISCARD the article.\n4. **Format Control:**\n   - Strictly DO NOT use asterisks (**) or hashes (#). Use only plain text.\n   - **CRITICAL URL RULE:** You MUST output the URL as a Markdown link. The syntax is `[URL](URL)`. Example: `[https://google.com](https://google.com)`.\n\n**[EXPORT]**\n- Return results immediately. No greetings or intros.\n- Null Result: If no articles pass the Step 3 Audit, output ONLY: \"Chuyên mục [Category Name] không có bài viết trong khung giờ {{memory.time}}\".\n\n**[RESPONSE TEMPLATE]**\n\nURL: [Insert_Full_URL_Here](Insert_Full_URL_Here)\nChuyên mục: [Category Name extracted in Step 1]\nTiêu đề bài viết: [Extracted Title]\nĐăng vào lúc: [HH:mm DD/MM/YYYY]\n\n(Repeat the template above for each matching article, separated by a single empty line).",
+      "variable": "llm_output",
+      "option": "{\"model\":\"gemini-2.0-flash\",\"temperature\":0,\"max_tokens\":10000,\"json_output\":false,\"local\":false}",
+      "_id": "-+Q^w4lApCO_4[Nk87Ia"
+    },
+    {
+      "label": "",
+      "action": "output",
+      "target": "chat",
+      "variable": " memory.llm_output",
+      "option": "",
+      "_id": "-`+LL=M+X9Hq9+U^l$yF"
+    },
+    {
+      "label": "",
+      "action": "endeach",
+      "target": "",
+      "variable": "",
+      "option": "",
+      "_id": "r@f9wQBZzw2!hN{.u4s@"
+    },
+    {
+      "label": "Coppy các bài báo khung chat vào canvas",
+      "action": "input",
+      "target": "canvas",
+      "variable": "cantomtat",
+      "option": "",
+      "_id": "Y2]`E6_;-I/-;d0X(9bs"
+    },
+    {
+      "label": "",
+      "action": "ai_llm",
+      "target": "# 1. ROLE (VAI TRÒ)\nBạn là \"News URL Extractor & Classifier\" (Bộ trích xuất và phân loại link tin tức chuyên nghiệp).\nNhiệm vụ: Quét TOÀN BỘ dữ liệu đầu vào, phân loại bài viết vào 4 nhóm chủ đề và trích xuất sạch đường dẫn (URL).\n\n# 2. INPUT DATA\n{{memory.cantomtat}}\n\n# 3. PROCESSING LOGIC\n1. **Scan (Quét):** Đọc từng dòng trong dữ liệu nguồn. Bỏ qua các dòng thông báo lỗi (ví dụ: \"không có bài viết trong khung giờ\").\n2. **Clean (Làm sạch):** Nếu URL bị dính ký tự lạ (ví dụ: `[url...]`, `<span>`, `Fri, 23 Jan`), hãy lọc bỏ rác và chỉ giữ lại đường link `https://...` hợp lệ.\n3. **Map (Phân loại):** Dựa vào metadata \"Chuyên mục\" hoặc từ khóa trong URL/Tiêu đề, gán bài viết vào 1 trong 4 nhóm:\n   - **Xã hội:** Thời sự, Chính trị, Y tế, Giáo dục, Đời sống, Giao thông, Môi trường, Văn hóa.\n   - **Kinh tế:** Tài chính, Kinh doanh, Thị trường, Bất động sản, Tiền tệ, Doanh nghiệp.\n   - **Pháp luật:** An ninh, Trật tự, Hình sự, Tòa án, Vụ án.\n   - **Thế giới:** Tin quốc tế, Ngoại giao, Quân sự thế giới.\n4. **Export (Xuất):** Gom nhóm và liệt kê đầy đủ.\n\n# 4. CONSTRAINT (RÀNG BUỘC TUYỆT ĐỐI)\n- **NO FILTERING:** Tuyệt đối KHÔNG lọc bỏ bài viết dựa trên thời gian đăng. Lấy tất cả các mốc giờ (00:00 - 23:59) và tất cả các ngày có trong dữ liệu.\n- **EXHAUSTIVE:** Phải liệt kê hết 100% số lượng link tìm thấy. Không được tóm tắt hay làm mẫu.\n- **FORMAT:** Chỉ in ra URL trần (Raw URL).\n\n# 5. RESPONSE TEMPLATE\nDưới đây là tổng hợp toàn bộ link tin tức tìm thấy:\n\n## 1. Chuyên mục Kinh tế ([Số lượng] bài)\n- https://open.spotify.com/track/0Jlcvv8IykzHaSmj49uNW8\n- https://www.youtube.com/watch?v=DTPkn93EkmA\n...\n\n## 2. Chuyên mục Xã hội ([Số lượng] bài)\n- https://open.spotify.com/track/0Jlcvv8IykzHaSmj49uNW8\n- https://www.youtube.com/watch?v=DTPkn93EkmA\n...\n\n## 3. Chuyên mục Thế giới ([Số lượng] bài)\n- https://open.spotify.com/track/0Jlcvv8IykzHaSmj49uNW8\n- https://www.youtube.com/watch?v=DTPkn93EkmA\n...\n\n## 4. Chuyên mục Pháp luật ([Số lượng] bài)\n- https://open.spotify.com/track/0Jlcvv8IykzHaSmj49uNW8\n- https://www.youtube.com/watch?v=DTPkn93EkmA\n...",
+      "variable": "tomtat",
+      "option": "{\"model\":\"gemini-2.0-flash\",\"temperature\":0,\"max_tokens\":30000,\"json_output\":false,\"local\":false}",
+      "_id": "cE5-jb{8g~E{aM/:;GN#"
+    },
+    {
+      "label": "",
+      "action": "output",
+      "target": "chat",
+      "variable": "memory.tomtat",
+      "option": "",
+      "_id": "g=VnfNN7oQ`ozwf9`I5f"
+    },
+    {
+      "label": "Nhập url bài viết cần tóm tắt vào canvas",
+      "action": "input",
+      "target": "canvas",
+      "variable": "urltomtat",
+      "option": "",
+      "_id": ";6-p?ImF(,JZ%eqQ3Qo!"
+    },
+    {
+      "label": "",
+      "action": "ai_multimodal",
+      "target": "# VAI TRÒ\nBạn là một Chuyên gia Tổng hợp Tin tức. Nhiệm vụ của bạn là xử lý danh sách URL, trích xuất tiêu đề chính xác và tóm tắt nội dung.\n\n# DỮ LIỆU ĐẦU VÀO\nDanh sách URL: {{memory.urltomtat}}\n\n# QUY ĐỊNH VỀ ĐỊNH DẠNG (FORMATTING RULES) - BẮT BUỘC\nĐể đảm bảo hiển thị đúng, bạn phải tuân thủ cú pháp Markdown sau:\n\n1.  **ĐỐI VỚI TIÊU ĐỀ (TITLE):**\n    * Phải trích xuất **NGUYÊN VĂN** tiêu đề bài viết (H1).\n    * Bắt buộc phải **IN ĐẬM** tiêu đề bằng cách kẹp giữa hai dấu sao (**).\n    * Ví dụ đúng: **Đây là tiêu đề bài viết**\n\n2.  **ĐỐI VỚI NỘI DUNG TÓM TẮT (BODY):**\n    * Viết dưới dạng **văn bản thường (Normal Text)**.\n    * Tuyệt đối KHÔNG in đậm, KHÔNG in nghiêng toàn bộ đoạn văn.\n    * Chỉ viết một đoạn văn liền mạch, súc tích.\n\n# VÍ DỤ MẪU (GOLDEN SAMPLE)\n**Văn phòng Đại diện Thương mại Mỹ tiếp tục hoãn áp thuế**\nVăn phòng Đại diện Thương mại Mỹ (USTR) thông báo tiếp tục hoãn áp đặt các biện pháp thuế quan trả đũa đối với hàng hóa từ Áo, Pháp, Italy, Tây Ban Nha, Anh và Thổ Nhĩ Kỳ. Quyết định này nhằm tạo thêm thời gian cho các cuộc đàm phán về một thỏa thuận thuế toàn cầu do OECD dẫn dắt được hoàn tất.\n\n# HƯỚNG DẪN THỰC HIỆN (STEP-BY-STEP)\n1.  Truy cập từng URL trong biến bộ nhớ.\n2.  Tìm dòng tiêu đề chính của bài báo. Đặt nó trong định dạng: **Tiêu đề**.\n3.  Xuống dòng.\n4.  Viết nội dung tóm tắt ở định dạng chữ thường ngay bên dưới.\n5.  Sử dụng dấu \"---\" để ngăn cách giữa các bài báo khác nhau.\n\n# ĐẦU RA MONG MUỐN (OUTPUT FORMAT)\n**[Tiêu đề bài báo 1]**\n[Nội dung tóm tắt bài báo 1 (chữ thường)]\n---\n**[Tiêu đề bài báo 2]**\n[Nội dung tóm tắt bài báo 2 (chữ thường)]",
+      "variable": "ketquatomtat",
+      "option": "{\n\"model\": \"gemini-2.5-pro\",\n\"local\": false,\n\"temperature\": 0.2,\n\"max_tokens\": 30000,\n\"json_output\": false,\n\"attachments\": []\n}",
+      "_id": "v%z$lX{-p`7K/:EG|@d4"
+    },
+    {
+      "label": "",
+      "action": "output",
+      "target": "canvas",
+      "variable": " memory.ketquatomtat",
+      "option": "",
+      "_id": "`a7dk1`UhC-tzAoi6!6V"
+    },
+    {
+      "label": "",
+      "action": "goto",
+      "target": "16",
+      "variable": "",
+      "option": "",
+      "_id": "SMbi.0W!5GsCD6O]KSqH"
+    }
+  ]
+}
