@@ -62,7 +62,7 @@ class Summarizer:
         """
         Extract main content from HTML using BeautifulSoup
         """
-        soup = BeautifulSoup(html, 'lxml')
+        soup = BeautifulSoup(html, 'html.parser')
         
         # Remove script and style elements
         for script in soup(["script", "style", "nav", "footer", "header"]):
