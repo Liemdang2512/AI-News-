@@ -1,131 +1,77 @@
-# 🚀 Hướng dẫn Deploy lên Vercel
+# 🚀 Hướng dẫn Deploy: Vercel (Frontend) + Render (Backend)
 
-## 📋 Yêu cầu
-- Tài khoản GitHub (đã có)
-- Tài khoản Vercel (đăng ký miễn phí tại [vercel.com](https://vercel.com))
-- Google Gemini API Key
+Do backend sử dụng **Playwright** để bypass anti-bot (báo Lao Động), chúng ta cần deploy Backend lên **Render** (hỗ trợ Docker) thay vì Vercel Serverless.
 
-## 🔧 Các bước Deploy
+## 📋 Chuẩn bị
+- Tài khoản GitHub (đã có code)
+- Tài khoản [Vercel](https://vercel.com) (Frontend)
+- Tài khoản [Render](https://render.com) (Backend)
+- Gemini API Key
 
-### 1. Chuẩn bị Repository
-✅ **Đã hoàn thành** - Code đã được push lên GitHub:
-```
-https://github.com/Liemdang2512/AI-News-.git
-```
+---
 
-### 2. Deploy Frontend lên Vercel
+## �️ Phần 1: Deploy Backend lên Render
 
-#### Bước 2.1: Import Project
-1. Truy cập [vercel.com](https://vercel.com)
-2. Đăng nhập bằng GitHub
-3. Click **"Add New..."** → **"Project"**
-4. Chọn repository: `Liemdang2512/AI-News-`
-5. Click **"Import"**
+1. **Đăng nhập Render**: Truy cập https://dashboard.render.com/
+2. **Tạo Web Service mới**:
+   - Chọn **"New +"** → **"Web Service"**
+   - Chọn **"Build and deploy from a Git repository"**
+   - Kết nối với repo GitHub: `Liemdang2512/AI-News-`
 
-#### Bước 2.2: Cấu hình Project
-- **Framework Preset**: Next.js
-- **Root Directory**: `frontend`
-- **Build Command**: `npm run build`
-- **Output Directory**: `.next`
-- **Install Command**: `npm install`
+3. **Cấu hình Service**:
+   - **Name**: `ai-news-backend`
+   - **Region**: Singapore (cho nhanh)
+   - **Root Directory**: `backend` (⚠️ Quan trọng)
+   - **Runtime**: **Docker** (Render sẽ tự nhận diện Dockerfile trong thư mục backend)
+   - **Instance Type**: Free
 
-#### Bước 2.3: Thêm Environment Variables
-Click **"Environment Variables"** và thêm:
-```
-NEXT_PUBLIC_API_URL=https://your-backend-url.vercel.app
-```
-*(Sẽ cập nhật sau khi deploy backend)*
+4. **Environment Variables** (Kéo xuống dưới):
+   - Key: `GEMINI_API_KEY`
+   - Value: `Paste_Key_Cua_Ban_Vao_Day`
+   - Key: `PYTHONUNBUFFERED`
+   - Value: `1`
 
-#### Bước 2.4: Deploy
-- Click **"Deploy"**
-- Đợi 2-3 phút để build hoàn tất
-- Lưu lại URL frontend (ví dụ: `https://ai-news-frontend.vercel.app`)
+5. **Deploy**:
+   - Click **"Create Web Service"**
+   - Đợi khoảng 3-5 phút để Render build Docker image và cài đặt Playwright.
+   - Khi hoàn tất, copy URL backend (ví dụ: `https://ai-news-backend.onrender.com`)
 
-### 3. Deploy Backend lên Vercel
+---
 
-#### Bước 3.1: Tạo Project mới
-1. Click **"Add New..."** → **"Project"**
-2. Chọn lại repository: `Liemdang2512/AI-News-`
-3. Click **"Import"**
+## 🎨 Phần 2: Deploy Frontend lên Vercel
 
-#### Bước 3.2: Cấu hình Project
-- **Framework Preset**: Other
-- **Root Directory**: `backend`
-- **Build Command**: (để trống)
-- **Output Directory**: (để trống)
+1. **Đăng nhập Vercel**: Truy cập https://vercel.com
+2. **Import Project**:
+   - Click **"Add New..."** → **"Project"**
+   - Chọn repo `Liemdang2512/AI-News-`
 
-#### Bước 3.3: Thêm Environment Variables
-Click **"Environment Variables"** và thêm:
-```
-GEMINI_API_KEY=your_gemini_api_key_here
-```
+3. **Cấu hình Project**:
+   - **Root Directory**: Click "Edit" và chọn thư mục `frontend`
+   - **Framework Preset**: Next.js (Mặc định)
 
-#### Bước 3.4: Deploy
-- Click **"Deploy"**
-- Đợi 2-3 phút để deploy hoàn tất
-- Lưu lại URL backend (ví dụ: `https://ai-news-backend.vercel.app`)
+4. **Environment Variables**:
+   - Key: `NEXT_PUBLIC_API_URL`
+   - Value: URL Backend bạn vừa copy ở Bước 1 (Ví dụ: `https://ai-news-backend.onrender.com`)
+   - ⚠️ **Lưu ý**: Không có dấu `/` ở cuối URL
 
-### 4. Cập nhật Frontend với Backend URL
+5. **Deploy**:
+   - Click **"Deploy"**
+   - Đợi 1-2 phút.
 
-#### Bước 4.1: Cập nhật Environment Variable
-1. Vào project Frontend trên Vercel
-2. Settings → Environment Variables
-3. Cập nhật `NEXT_PUBLIC_API_URL` với URL backend vừa deploy
-4. Click **"Save"**
+---
 
-#### Bước 4.2: Redeploy Frontend
-1. Vào tab **"Deployments"**
-2. Click **"..."** ở deployment mới nhất
-3. Click **"Redeploy"**
+## ✅ Kiểm tra Hoạt động
 
-### 5. Cấu hình CORS (nếu cần)
+1. Mở trang Frontend vừa deploy trên Vercel.
+2. Thử tìm kiếm tin tức từ **Lao Động**.
+3. Nếu thấy báo "Đang xử lý..." hơi lâu một chút (do Playwright khởi động), đó là bình thường.
+4. Kiểm tra kết quả trả về.
 
-Nếu gặp lỗi CORS, cập nhật file `backend/main.py`:
-```python
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["https://your-frontend-url.vercel.app"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-```
+---
 
-## ✅ Kiểm tra Deployment
+## ℹ️ Lưu ý về Server Miễn phí
 
-1. Truy cập URL frontend
-2. Nhập Gemini API Key
-3. Thử tìm kiếm và tóm tắt bài viết
-4. Kiểm tra format:
-   - Tên báo và chuyên mục IN HOA (14px)
-   - URL không có prefix "URL:"
-   - Export Word hoạt động đúng
+- **Render Free Tier**: Server sẽ "ngủ" (spin down) nếu không có request trong 15 phút. Request đầu tiên sau khi ngủ sẽ mất khoảng 50 giây để khởi động lại.
+  - *Mẹo*: Dùng [UptimeRobot](https://uptimerobot.com/) ping vào URL backend mỗi 10 phút để giữ server luôn chạy.
 
-## 🔍 Troubleshooting
-
-### Lỗi: "API request failed"
-- Kiểm tra `NEXT_PUBLIC_API_URL` đã đúng chưa
-- Kiểm tra backend có deploy thành công không
-
-### Lỗi: "Gemini API error"
-- Kiểm tra `GEMINI_API_KEY` đã được set chưa
-- Kiểm tra API key còn hạn sử dụng không
-
-### Lỗi: Build failed
-- Kiểm tra logs trong Vercel
-- Đảm bảo tất cả dependencies trong `package.json` và `requirements.txt`
-
-## 📝 Lưu ý
-
-- Vercel miễn phí có giới hạn:
-  - 100GB bandwidth/tháng
-  - 100 deployments/ngày
-  - Serverless function timeout: 10s (Hobby), 60s (Pro)
-  
-- Nếu cần timeout dài hơn cho AI summarization, cân nhắc nâng cấp lên Vercel Pro
-
-## 🎉 Hoàn thành!
-
-Ứng dụng của bạn đã sẵn sàng sử dụng tại:
-- Frontend: `https://your-app.vercel.app`
-- Backend: `https://your-api.vercel.app`
+- **Vercel**: Chạy rất nhanh và ổn định cho Frontend.

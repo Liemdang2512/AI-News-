@@ -4,6 +4,7 @@ from typing import List, Dict, Optional
 from datetime import datetime, time
 from dateutil import parser as date_parser
 import re
+from services.playwright_fetcher import playwright_fetcher
 
 class RSSFetcher:
     """
@@ -14,7 +15,7 @@ class RSSFetcher:
     
     # Map RSS feed URLs to newspaper display names
     NEWSPAPER_SOURCES = {
-        "laodong.vn": "LÃO ĐỘNG",
+        "laodong.vn": "LAO ĐỘNG",
         "dantri.com.vn": "DÂN TRÍ",
         "vtv.vn": "VTV NEWS",
         "hanoimoi.vn": "HÀ NỘI MỚI",
@@ -55,28 +56,84 @@ class RSSFetcher:
         
         all_articles = []
         
-        # Fetch each RSS feed
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            for rss_url in rss_urls:
-                try:
-                    response = await client.get(rss_url)
-                    feed = feedparser.parse(response.text)
-                    
-                    # Process each entry
-                    for entry in feed.entries:
-                        article = self._process_entry(
-                            entry,
-                            target_dt,
-                            start_time,
-                            end_time,
-                            rss_url
-                        )
-                        if article:
-                            all_articles.append(article)
-                            
-                except Exception as e:
-                    print(f"Error fetching {rss_url}: {str(e)}")
-                    continue
+        # Separate URLs by whether they need Playwright (anti-bot protection)
+        playwright_urls = []
+        normal_urls = []
+        
+        for url in rss_urls:
+            if 'laodong.vn' in url.lower():
+                playwright_urls.append(url)
+            else:
+                normal_urls.append(url)
+        
+        # Fetch Playwright URLs (Lao Dong with anti-bot protection)
+        if playwright_urls:
+            print(f"🎭 Using Playwright for {len(playwright_urls)} URLs (anti-bot protection)")
+            try:
+                playwright_contents = await playwright_fetcher.fetch_multiple_rss(playwright_urls)
+                
+                for rss_url, content in playwright_contents.items():
+                    if content:
+                        feed = feedparser.parse(content)
+                        print(f"   ✅ {rss_url}: {len(feed.entries)} entries")
+                        
+                        # Process each entry
+                        for entry in feed.entries:
+                            article = self._process_entry(
+                                entry,
+                                target_dt,
+                                start_time,
+                                end_time,
+                                rss_url
+                            )
+                            if article:
+                                all_articles.append(article)
+                    else:
+                        print(f"   ❌ {rss_url}: No content fetched")
+            except Exception as e:
+                print(f"❌ Playwright error: {str(e)}")
+        
+        # Fetch normal URLs with httpx (faster)
+        if normal_urls:
+            print(f"⚡ Using HTTP for {len(normal_urls)} URLs (no anti-bot)")
+            
+            # Headers to bypass basic anti-bot
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'application/rss+xml, application/xml, text/xml, */*',
+                'Accept-Language': 'vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
+            }
+            
+            async with httpx.AsyncClient(
+                timeout=30.0,
+                follow_redirects=True,
+                headers=headers
+            ) as client:
+                for rss_url in normal_urls:
+                    try:
+                        response = await client.get(rss_url)
+                        feed = feedparser.parse(response.text)
+                        
+                        print(f"   ✅ {rss_url}: {len(feed.entries)} entries")
+                        
+                        # Process each entry
+                        for entry in feed.entries:
+                            article = self._process_entry(
+                                entry,
+                                target_dt,
+                                start_time,
+                                end_time,
+                                rss_url
+                            )
+                            if article:
+                                all_articles.append(article)
+                                
+                    except Exception as e:
+                        print(f"   ❌ {rss_url}: {str(e)}")
+                        continue
         
         return all_articles
     
