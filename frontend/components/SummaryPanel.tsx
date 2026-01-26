@@ -24,9 +24,20 @@ export default function SummaryPanel({ summary }: SummaryPanelProps) {
                         h2: ({ children }) => (
                             <h2 className="text-xl font-bold text-gray-900 mb-3">{children}</h2>
                         ),
-                        p: ({ children }) => (
-                            <p className="text-gray-700 mb-4 leading-relaxed">{children}</p>
-                        ),
+                        p: ({ children }) => {
+                            // Check if this paragraph contains source info (has | and is uppercase)
+                            const text = children?.toString() || '';
+                            const isSource = text.includes('|') && text === text.toUpperCase();
+
+                            return (
+                                <p className={`mb-4 leading-relaxed ${isSource
+                                        ? 'text-[14px] font-semibold text-gray-800 uppercase'
+                                        : 'text-gray-700'
+                                    }`}>
+                                    {children}
+                                </p>
+                            );
+                        },
                         strong: ({ children }) => (
                             <strong className="font-bold text-gray-900">{children}</strong>
                         ),

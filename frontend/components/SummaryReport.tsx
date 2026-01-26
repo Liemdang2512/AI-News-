@@ -66,11 +66,11 @@ export default function SummaryReport({ summary, metadata, onBack }: SummaryRepo
                     paragraphs.push(new Paragraph({ text: '', spacing: { after: 100 } }));
                 } else if (trimmed === '---') {
                     paragraphs.push(new Paragraph({ text: '', spacing: { after: 200 } }));
-                } else if (trimmed.includes('|')) {
-                    // Source | Category
+                } else if (trimmed.includes('|') && trimmed === trimmed.toUpperCase()) {
+                    // Source | Category (uppercase)
                     paragraphs.push(
                         new Paragraph({
-                            children: [new TextRun({ text: trimmed, size: 20, color: '666666', italics: true })],
+                            children: [new TextRun({ text: trimmed, size: 28, color: '333333', bold: true })],
                             spacing: { before: 200, after: 100 },
                         })
                     );
@@ -81,6 +81,35 @@ export default function SummaryReport({ summary, metadata, onBack }: SummaryRepo
                         new Paragraph({
                             children: [new TextRun({ text: title, bold: true, size: 24 })],
                             spacing: { after: 100 },
+                        })
+                    );
+                } else if (trimmed.match(/^\[(.+?)\]\((.+?)\)$/)) {
+                    // Markdown link: [text](url)
+                    const match = trimmed.match(/^\[(.+?)\]\((.+?)\)$/);
+                    if (match) {
+                        const linkText = match[1];
+                        const url = match[2];
+                        paragraphs.push(
+                            new Paragraph({
+                                children: [
+                                    new TextRun({
+                                        text: url,
+                                        size: 20,
+                                        color: '0066CC',
+                                        underline: {},
+                                    })
+                                ],
+                                spacing: { after: 150 },
+                            })
+                        );
+                    }
+                } else if (trimmed.startsWith('-')) {
+                    // Bullet point
+                    const text = trimmed.substring(1).trim();
+                    paragraphs.push(
+                        new Paragraph({
+                            children: [new TextRun({ text: `• ${text}`, size: 22 })],
+                            spacing: { after: 150 },
                         })
                     );
                 } else {
