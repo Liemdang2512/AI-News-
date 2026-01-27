@@ -89,10 +89,6 @@ jobs:
       - name: Install frontend dependencies & build
         run: |
           cd frontend
-          echo "=== DEBUG: Checking package-lock.json ==="
-          ls -la package-lock.json || echo "package-lock.json NOT FOUND!"
-          head -5 package-lock.json || true
-          echo "=== Running npm ci ==="
           npm ci
           npm run build
       
@@ -104,10 +100,6 @@ jobs:
       - name: Install desktop dependencies
         run: |
           cd desktop
-          echo "=== DEBUG: Checking package-lock.json ==="
-          ls -la package-lock.json || echo "package-lock.json NOT FOUND!"
-          head -5 package-lock.json || true
-          echo "=== Running npm ci ==="
           npm ci
       
       - name: Build desktop app
