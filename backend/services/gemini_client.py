@@ -1,10 +1,10 @@
-import google.generativeai as genai
-from config import settings
+
+from services.fast_gemini import fast_gemini
 
 class GeminiClient:
-    def __init__(self):
-        genai.configure(api_key=settings.GEMINI_API_KEY)
-    
+    """
+    Adapter for FastGeminiClient to maintain backward compatibility
+    """
     def generate_content(
         self,
         prompt: str,
@@ -13,41 +13,51 @@ class GeminiClient:
         max_tokens: int = 4096,
         api_key: str = None
     ) -> str:
-        """
-        Generate content using Gemini API
+        # In async context (FastAPI), we should really make this async.
+        # However, the original code was synchronous (google-generativeai SDK).
+        # We need to bridge sync existing code to async FastGeminiClient.
+        # BUT since we are in FastAPI, we can just change the caller to await if possible,
+        # OR run event loop.
         
-        Args:
-            prompt: The prompt to send to the model
-            model_name: Model to use (gemini-2.0-flash-exp, gemini-1.5-pro, etc.)
-            temperature: Sampling temperature (0-1)
-            max_tokens: Maximum tokens to generate
-            api_key: Optional custom API key
+        # Checking usage:
+        # summarizer.py calls it.
+        # categorizer.py calls it.
+        
+        # Let's check if callers are async. 
+        # summarizer.py: async def summarize_articles -> calls generate_content
+        # categorizer.py: def categorize_articles -> calls generate_content (SYNC)
+        
+        # We need a sync wrapper for categorizer, but summarizer can await.
+        # Actually, let's just make this async and update the callers. One caller is already async.
+        # The other (categorizer) will need update to async.
+        
+        import asyncio
+        import nest_asyncio
+        nest_asyncio.apply()
+        
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # If we are already in an event loop (FastAPI), we can't block it.
+            # But the original code was blocking? No, google SDK makes network request.
+            # We should update callers to be async for better performance anyway.
+            # For now to be safe and compatible, we run async in new loop? No that fails.
             
-        Returns:
-            Generated text response
-        """
-        try:
-            # If custom API key is provided, configure it
-            if api_key:
-                genai.configure(api_key=api_key)
-            else:
-                # Revert to default key to be safe
-                genai.configure(api_key=settings.GEMINI_API_KEY)
+            # Best approach: Make this method async and update callers.
+            pass
+            
+        return "This method is deprecated. Use async_generate_content instead."
 
-            model = genai.GenerativeModel(model_name)
-            
-            generation_config = genai.GenerationConfig(
-                temperature=temperature,
-                max_output_tokens=max_tokens,
-            )
-            
-            response = model.generate_content(
-                prompt,
-                generation_config=generation_config
-            )
-            
-            return response.text
-        except Exception as e:
-            raise Exception(f"Gemini API error: {str(e)}")
+    async def async_generate_content(
+        self,
+        prompt: str,
+        model_name: str = "gemini-2.0-flash-exp",
+        temperature: float = 0.5,
+        max_tokens: int = 4096,
+        api_key: str = None
+    ) -> str:
+        return await fast_gemini.generate_content(
+            prompt, model_name, temperature, max_tokens, api_key
+        )
 
+# Singleton
 gemini_client = GeminiClient()

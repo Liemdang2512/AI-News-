@@ -8,7 +8,7 @@ class Categorizer:
     Uses prompt from prompts.py file
     """
     
-    def categorize_articles(self, articles_text: str) -> str:
+    async def categorize_articles(self, articles_text: str) -> str:
         """
         Categorize articles into: Xã hội, Kinh tế, Pháp luật, Thế giới
         
@@ -22,7 +22,7 @@ class Categorizer:
         prompt = CATEGORIZE_PROMPT.format(articles_text=articles_text)
 
         try:
-            response = gemini_client.generate_content(
+            response = await gemini_client.async_generate_content(
                 prompt=prompt,
                 model_name="gemini-2.0-flash",
                 temperature=0,

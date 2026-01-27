@@ -86,7 +86,7 @@ async def categorize_articles(request: CategorizeRequest):
     Replaces third ai_llm node in JSON workflow
     """
     try:
-        categorized = categorizer.categorize_articles(request.articles_text)
+        categorized = await categorizer.categorize_articles(request.articles_text)
         return CategorizeResponse(categorized_text=categorized)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

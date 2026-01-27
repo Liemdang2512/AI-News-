@@ -58,7 +58,7 @@ class Summarizer:
         prompt = SUMMARIZE_PROMPT.format(articles_content=articles_content)
 
         try:
-            response = gemini_client.generate_content(
+            response = await gemini_client.async_generate_content(
                 prompt=prompt,
                 model_name="gemini-2.0-flash",
                 temperature=0.2,
