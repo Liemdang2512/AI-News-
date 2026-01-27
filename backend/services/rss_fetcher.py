@@ -4,7 +4,7 @@ from typing import List, Dict, Optional
 from datetime import datetime, time
 from dateutil import parser as date_parser
 import re
-from services.playwright_fetcher import playwright_fetcher
+from services.secure_fetcher import secure_fetcher
 
 class RSSFetcher:
     """
@@ -56,23 +56,23 @@ class RSSFetcher:
         
         all_articles = []
         
-        # Separate URLs by whether they need Playwright (anti-bot protection)
-        playwright_urls = []
+        # Separate URLs by whether they need Secure Fetcher (anti-bot protection)
+        secure_urls = []
         normal_urls = []
         
         for url in rss_urls:
             if 'laodong.vn' in url.lower():
-                playwright_urls.append(url)
+                secure_urls.append(url)
             else:
                 normal_urls.append(url)
         
-        # Fetch Playwright URLs (Lao Dong with anti-bot protection)
-        if playwright_urls:
-            print(f"🎭 Using Playwright for {len(playwright_urls)} URLs (anti-bot protection)")
+        # Fetch Secure URLs (Lao Dong with anti-bot protection)
+        if secure_urls:
+            print(f"🛡️ Using Secure Fetcher for {len(secure_urls)} URLs (anti-bot protection)")
             try:
-                playwright_contents = await playwright_fetcher.fetch_multiple_rss(playwright_urls)
+                secure_contents = await secure_fetcher.fetch_multiple_rss(secure_urls)
                 
-                for rss_url, content in playwright_contents.items():
+                for rss_url, content in secure_contents.items():
                     if content:
                         feed = feedparser.parse(content)
                         print(f"   ✅ {rss_url}: {len(feed.entries)} entries")
@@ -91,7 +91,7 @@ class RSSFetcher:
                     else:
                         print(f"   ❌ {rss_url}: No content fetched")
             except Exception as e:
-                print(f"❌ Playwright error: {str(e)}")
+                print(f"❌ Secure Fetcher error: {str(e)}")
         
         # Fetch normal URLs with httpx (faster)
         if normal_urls:

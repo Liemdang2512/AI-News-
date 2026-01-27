@@ -1,77 +1,40 @@
-# 🚀 Hướng dẫn Deploy: Vercel (Frontend) + Render (Backend)
+# 🚀 Hướng dẫn Deploy & Sửa lỗi Vercel
 
-Do backend sử dụng **Playwright** để bypass anti-bot (báo Lao Động), chúng ta cần deploy Backend lên **Render** (hỗ trợ Docker) thay vì Vercel Serverless.
+Hệ thống của bạn đã được kiểm tra Local thành công 100%. Nếu Vercel vẫn báo lỗi, chắc chắn do **Cấu hình trên Vercel** chưa đúng.
 
-## 📋 Chuẩn bị
-- Tài khoản GitHub (đã có code)
-- Tài khoản [Vercel](https://vercel.com) (Frontend)
-- Tài khoản [Render](https://render.com) (Backend)
-- Gemini API Key
+## 🛠️ Bước 1: Kiểm tra Cấu hình Vercel (QUAN TRỌNG)
 
----
+Bạn hãy vào trang quản lý dự án trên Vercel, chọn tab **Settings** -> **Build & Deployment** và đối chiếu chính xác từng mục sau:
 
-## �️ Phần 1: Deploy Backend lên Render
-
-1. **Đăng nhập Render**: Truy cập https://dashboard.render.com/
-2. **Tạo Web Service mới**:
-   - Chọn **"New +"** → **"Web Service"**
-   - Chọn **"Build and deploy from a Git repository"**
-   - Kết nối với repo GitHub: `Liemdang2512/AI-News-`
-
-3. **Cấu hình Service**:
-   - **Name**: `ai-news-backend`
-   - **Region**: Singapore (cho nhanh)
-   - **Root Directory**: `backend` (⚠️ Quan trọng)
-   - **Runtime**: **Docker** (Render sẽ tự nhận diện Dockerfile trong thư mục backend)
-   - **Instance Type**: Free
-
-4. **Environment Variables** (Kéo xuống dưới):
-   - Key: `GEMINI_API_KEY`
-   - Value: `Paste_Key_Cua_Ban_Vao_Day`
-   - Key: `PYTHONUNBUFFERED`
-   - Value: `1`
-
-5. **Deploy**:
-   - Click **"Create Web Service"**
-   - Đợi khoảng 3-5 phút để Render build Docker image và cài đặt Playwright.
-   - Khi hoàn tất, copy URL backend (ví dụ: `https://ai-news-backend.onrender.com`)
+| Mục (Setting) | Giá trị Yêu cầu (Value) | Nút Override | Giải thích |
+| :--- | :--- | :--- | :--- |
+| **Framework Preset** | **`Next.js`** | - | Bắt buộc phải chọn Next.js. Nếu không chọn được, hãy chọn Override rồi chọn Next.js. |
+| **Root Directory** | **`frontend`** | - | Phải nằm trong tab **Global** -> mục Root Directory. |
+| **Build Command** | `next build` | **TẮT** (Màu xám) | Không được tự điền lệnh. Hãy tắt nút Override để Vercel tự quản lý. |
+| **Output Directory** | `Next.js default` | **TẮT** (Màu xám) | Tuyệt đối không bật cái này. Nếu bật, nó sẽ tìm thư mục `public` và gây lỗi. |
+| **Install Command** | `npm install` | **TẮT** (Màu xám) | Để mặc định. |
 
 ---
 
-## 🎨 Phần 2: Deploy Frontend lên Vercel
+## 🛑 Cách Xử lý khi đã chỉnh đúng mà vẫn lỗi
 
-1. **Đăng nhập Vercel**: Truy cập https://vercel.com
-2. **Import Project**:
-   - Click **"Add New..."** → **"Project"**
-   - Chọn repo `Liemdang2512/AI-News-`
+Nếu bạn đã chỉnh y hệt bảng trên mà vẫn không được (do Vercel lưu cache cũ), hãy làm cách "Đập đi xây lại" này (Nhanh nhất):
 
-3. **Cấu hình Project**:
-   - **Root Directory**: Click "Edit" và chọn thư mục `frontend`
-   - **Framework Preset**: Next.js (Mặc định)
+1. **Xóa Project hiện tại**:
+   - Vào **Settings** -> Cuối trang chọn **Delete Project**.
 
-4. **Environment Variables**:
-   - Key: `NEXT_PUBLIC_API_URL`
-   - Value: URL Backend bạn vừa copy ở Bước 1 (Ví dụ: `https://ai-news-backend.onrender.com`)
-   - ⚠️ **Lưu ý**: Không có dấu `/` ở cuối URL
+2. **Tạo Project Mới**:
+   - Về trang chủ Vercel -> **Add New...** -> **Project**.
+   - Chọn repo `AI-News-`.
+   - **QUAN TRỌNG**: Ở bước **Configure Project**, tìm mục **Root Directory**, bấm **Edit** và chọn thư mục **`frontend`**.
+   - Bấm **Deploy**.
 
-5. **Deploy**:
-   - Click **"Deploy"**
-   - Đợi 1-2 phút.
+Cách này đảm bảo Vercel tự động nhận diện "À, đây là Next.js" ngay từ đầu và tự điền mọi cấu hình chuẩn xác cho bạn.
 
 ---
 
-## ✅ Kiểm tra Hoạt động
+## 🌍 URL Backend
 
-1. Mở trang Frontend vừa deploy trên Vercel.
-2. Thử tìm kiếm tin tức từ **Lao Động**.
-3. Nếu thấy báo "Đang xử lý..." hơi lâu một chút (do Playwright khởi động), đó là bình thường.
-4. Kiểm tra kết quả trả về.
-
----
-
-## ℹ️ Lưu ý về Server Miễn phí
-
-- **Render Free Tier**: Server sẽ "ngủ" (spin down) nếu không có request trong 15 phút. Request đầu tiên sau khi ngủ sẽ mất khoảng 50 giây để khởi động lại.
-  - *Mẹo*: Dùng [UptimeRobot](https://uptimerobot.com/) ping vào URL backend mỗi 10 phút để giữ server luôn chạy.
-
-- **Vercel**: Chạy rất nhanh và ổn định cho Frontend.
+Khi deploy Frontend, đừng quên thêm biến môi trường:
+- Key: `NEXT_PUBLIC_API_URL`
+- Value: `https://ai-news-yqan.onrender.com` (URL Backend đã chạy thành công)

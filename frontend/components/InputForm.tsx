@@ -9,7 +9,7 @@ interface InputFormProps {
 }
 
 const availableNewspapers = [
-    'Lao Động',
+    // 'Lao Động',
     'Dân Trí',
     'VTV',
     'Hà Nội Mới',
@@ -19,7 +19,7 @@ const availableNewspapers = [
 ];
 
 export default function InputForm({ onSubmit, loading }: InputFormProps) {
-    const [selectedNewspapers, setSelectedNewspapers] = useState<string[]>(['Lao Động', 'Dân Trí', 'VTV']);
+    const [selectedNewspapers, setSelectedNewspapers] = useState<string[]>(['Dân Trí', 'VTV']);
     const [showDropdown, setShowDropdown] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
     const [date, setDate] = useState(() => {
