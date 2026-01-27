@@ -6,7 +6,7 @@ from config import settings
 app = FastAPI(
     title="News Aggregator API",
     description="API for Vietnamese news aggregation and summarization",
-    version="1.0.0"
+    version="1.0.0",
 )
 
 # CORS Configuration
@@ -21,18 +21,36 @@ app.add_middleware(
 # Register routes
 app.include_router(news_router)
 
+
 @app.get("/")
 async def root():
     return {
         "message": "News Aggregator API",
         "version": "1.0.0",
-        "docs": "/docs"
+        "docs": "/docs",
     }
+
 
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
 
-if __name__ == "__main__":
+
+def run():
+    """
+    Start the FastAPI backend using configuration from settings.
+
+    This function is used both for local development and when the backend is
+    started as a bundled binary for the desktop app.
+    """
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+
+    uvicorn.run(
+        app,
+        host=settings.BACKEND_HOST,
+        port=settings.BACKEND_PORT,
+    )
+
+
+if __name__ == "__main__":
+    run()

@@ -1,0 +1,118 @@
+name: Build Desktop Apps
+
+on:
+  workflow_dispatch:  # Cho phép chạy thủ công từ GitHub Actions tab
+  push:
+    tags:
+      - 'v*'  # Chạy khi push tag bắt đầu bằng v (ví dụ: v1.0.0)
+
+jobs:
+  build-backend:
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+        include:
+          - os: macos-latest
+            backend_name: news-backend-mac
+            platform: mac
+          - os: windows-latest
+            backend_name: news-backend-win.exe
+            platform: win
+    
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install backend dependencies
+        run: |
+          pip install pyinstaller
+          pip install -r backend/requirements.txt
+      
+      - name: Build backend binary
+        run: |
+          cd backend
+          pyinstaller --onefile --name ${{ matrix.backend_name }} main.py
+      
+      - name: Upload backend binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-${{ matrix.platform }}
+          path: backend/dist/${{ matrix.backend_name }}
+
+  build-desktop:
+    needs: build-backend
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+        include:
+          - os: macos-latest
+            platform: mac
+            build_cmd: npm run build:mac
+          - os: windows-latest
+            platform: win
+            build_cmd: npm run build:win
+    
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Download backend binary (mac)
+        if: matrix.platform == 'mac'
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-mac
+          path: desktop/resources/backend/mac/
+      
+      - name: Download backend binary (win)
+        if: matrix.platform == 'win'
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-win
+          path: desktop/resources/backend/win/
+      
+      - name: Make backend executable (mac)
+        if: matrix.platform == 'mac'
+        run: chmod +x desktop/resources/backend/mac/news-backend-mac
+      
+      - name: Install frontend dependencies & build
+        run: |
+          cd frontend
+          npm install
+          npm run build
+      
+      - name: Copy frontend build to desktop
+        run: |
+          cp -r frontend/out desktop/frontend-dist
+        shell: bash
+      
+      - name: Install desktop dependencies
+        run: |
+          cd desktop
+          npm install
+      
+      - name: Build desktop app
+        run: |
+          cd desktop
+          ${{ matrix.build_cmd }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-${{ matrix.platform }}
+          path: |
+            desktop/dist/*.dmg
+            desktop/dist/*.exe

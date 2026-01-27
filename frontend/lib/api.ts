@@ -1,6 +1,25 @@
 // In production (Vercel), we use relative paths routed via vercel.json
-// In local development, we use http://localhost:8000
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
+// For desktop/Electron usage, we default to a local backend on 127.0.0.1:8000
+const getApiBaseUrl = () => {
+    // Highest priority: explicit env override
+    if (process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL.trim() !== '') {
+        return process.env.NEXT_PUBLIC_API_URL;
+    }
+
+    // If running inside a desktop shell (file:// or custom protocol),
+    // default to local backend
+    if (typeof window !== 'undefined') {
+        const protocol = window.location.protocol;
+        if (protocol === 'file:' || protocol === 'app:' || protocol === 'capacitor:') {
+            return 'http://127.0.0.1:8000';
+        }
+    }
+
+    // Fallback: empty string -> use relative paths (Vercel routing)
+    return '';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 export const api = {
     async matchRSS(newspapers: string) {

@@ -1,0 +1,48 @@
+{
+  "name": "news-aggregator-desktop",
+  "version": "1.0.0",
+  "description": "Desktop wrapper for Vietnamese news aggregator (Electron + local Python backend).",
+  "main": "main.js",
+  "scripts": {
+    "dev": "electron .",
+    "build:mac": "electron-builder --mac",
+    "build:win": "electron-builder --win"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "electron": "^32.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "com.yourname.newsaggregator",
+    "productName": "News Aggregator",
+    "files": [
+      "main.js",
+      "preload.js",
+      "frontend-dist/**"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/backend/mac/",
+        "to": "backend/mac",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "resources/backend/win/",
+        "to": "backend/win",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "mac": {
+      "target": "dmg"
+    },
+    "win": {
+      "target": "nsis"
+    }
+  }
+}
+
