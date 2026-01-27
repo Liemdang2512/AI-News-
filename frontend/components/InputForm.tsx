@@ -12,7 +12,7 @@ const availableNewspapers = [
     // 'Lao Động',
     'Dân Trí',
     'VTV',
-    'Hà Nội Mới',
+    // 'Hà Nội Mới',
     'Sài Gòn Giải Phóng',
     'VietnamPlus',
     'Tiền Phong'
