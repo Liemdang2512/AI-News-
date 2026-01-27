@@ -19,7 +19,7 @@
     "files": [
       "main.js",
       "preload.js",
-      "../frontend/out/**"
+      "frontend-dist/**"
     ],
     "extraResources": [
       {

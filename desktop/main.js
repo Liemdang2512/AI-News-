@@ -142,8 +142,12 @@ function createMainWindow() {
     show: false,
   });
 
-  // Load static Next.js export (assumes `next export` into frontend/out)
-  const indexPath = path.join(__dirname, '..', 'frontend', 'out', 'index.html');
+  // Load static Next.js export
+  // In production (packaged), files are in app.asar/frontend-dist
+  // In development, files are in desktop/frontend-dist
+  const indexPath = app.isPackaged
+    ? path.join(__dirname, 'frontend-dist', 'index.html')
+    : path.join(__dirname, 'frontend-dist', 'index.html');
   mainWindow.loadFile(indexPath);
 
   mainWindow.once('ready-to-show', () => {

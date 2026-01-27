@@ -10,3 +10,8 @@ ENV/
 .env
 *.log
 .DS_Store
+
+# PyInstaller outputs
+build/
+dist/
+*.spec

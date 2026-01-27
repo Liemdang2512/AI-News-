@@ -1,0 +1,12 @@
+# Build outputs
+dist/
+frontend-dist/
+node_modules/
+
+# Backend binaries (built per-platform)
+resources/backend/mac/news-backend-mac
+resources/backend/win/news-backend-win.exe
+
+# Keep the folders
+!resources/backend/mac/.gitkeep
+!resources/backend/win/.gitkeep
