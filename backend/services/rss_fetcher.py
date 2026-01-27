@@ -61,7 +61,8 @@ class RSSFetcher:
         normal_urls = []
         
         for url in rss_urls:
-            if 'laodong.vn' in url.lower():
+            # Lao Dong and Hanoi Moi need secure fetcher (anti-bot or IP blocking)
+            if 'laodong.vn' in url.lower() or 'hanoimoi.vn' in url.lower():
                 secure_urls.append(url)
             else:
                 normal_urls.append(url)
