@@ -89,7 +89,7 @@ jobs:
       - name: Install frontend dependencies & build
         run: |
           cd frontend
-          npm ci
+          npm install
           npm run build
       
       - name: Copy frontend build to desktop
@@ -100,7 +100,7 @@ jobs:
       - name: Install desktop dependencies
         run: |
           cd desktop
-          npm ci
+          npm install
       
       - name: Build desktop app
         run: |
