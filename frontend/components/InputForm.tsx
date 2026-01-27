@@ -29,9 +29,10 @@ export default function InputForm({ onSubmit, loading }: InputFormProps) {
         const year = today.getFullYear();
         return `${day}/${month}/${year}`;
     });
-    const [timeRange, setTimeRange] = useState('6h00 đến 8h00');
+    const [timeRange, setTimeRange] = useState('0h00 đến 23h59');
 
     const timeRanges = [
+        '0h00 đến 23h59',
         '6h00 đến 8h00',
         '8h00 đến 11h00',
         '11h00 đến 14h00',
