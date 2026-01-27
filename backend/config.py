@@ -3,9 +3,17 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
 class Settings:
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    # Backend server configuration
+    # Default host is 0.0.0.0 to preserve existing behaviour where the service
+    # is reachable from other network interfaces (e.g. Docker, LAN).
+    # Desktop/Electron builds can override this via BACKEND_HOST=127.0.0.1
+    # if they only need local access.
+    BACKEND_HOST: str = os.getenv("BACKEND_HOST", "0.0.0.0")
+    BACKEND_PORT: int = int(os.getenv("BACKEND_PORT", "8000"))
     
     # RSS Feed Database (from JSON workflow)
     RSS_DATABASE = [
@@ -39,5 +47,6 @@ class Settings:
         "https://tienphong.vn/rss/the-gioi-5.rss",
         "https://tienphong.vn/rss/phap-luat-12.rss",
     ]
+
 
 settings = Settings()
