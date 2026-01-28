@@ -7,8 +7,9 @@ import ArticleList from '@/components/ArticleList';
 import SummaryReport from '@/components/SummaryReport';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import CategoryStats from '@/components/CategoryStats';
-import { api } from '@/lib/api';
+import { api, API_BASE_URL } from '@/lib/api';
 import { Article } from '@/lib/types';
+import SummarizationProgress from '@/components/SummarizationProgress';
 
 export default function Home() {
     const [loading, setLoading] = useState(false);
@@ -30,6 +31,14 @@ export default function Home() {
     const [tempApiKey, setTempApiKey] = useState('');
     const [apiKeySaved, setApiKeySaved] = useState(false);
     const [showApiConfig, setShowApiConfig] = useState(true); // Show by default, hide after save
+
+    // Progress for summarization
+    const [progressData, setProgressData] = useState({
+        completed: 0,
+        total: 0,
+        currentArticle: '',
+        status: 'processing'
+    });
 
     useEffect(() => {
         const storedKey = localStorage.getItem('gemini_api_key');
@@ -135,23 +144,75 @@ export default function Home() {
         setSummary('');
         setCurrentProgressStep(3); // Step 3: Generating summary
 
+        // Reset progress
+        setProgressData({
+            completed: 0,
+            total: urls.length,
+            currentArticle: 'Đang khởi tạo...',
+            status: 'processing'
+        });
+
+        // Determined selected articles
+        const selectedArticles = articles.filter(article => urls.includes(article.url));
+        // Update metadata with selected count
+        if (searchMetadata) {
+            setSearchMetadata({ ...searchMetadata, totalArticles: selectedArticles.length });
+        }
+
         try {
             setCurrentStep('Đang tóm tắt bài viết...');
-            console.log('Summarizing with API Key:', apiKey ? '***' + apiKey.slice(-4) : 'No API key');
 
-            // Find the full article objects for the selected URLs
-            const selectedArticles = articles.filter(article => urls.includes(article.url));
-
-            
-            // Update metadata with selected count
-            if (searchMetadata) {
-                setSearchMetadata({ ...searchMetadata, totalArticles: selectedArticles.length });
+            // Construct WebSocket URL
+            let wsUrl = API_BASE_URL;
+            if (!wsUrl || wsUrl === '') {
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                wsUrl = `${protocol}//${window.location.host}`;
+            } else {
+                wsUrl = wsUrl.replace(/^http/, 'ws');
             }
-            const response = await api.summarizeArticles(urls, apiKey, selectedArticles);
-            setSummary(response.summary);
-            setCurrentProgressStep(4); // Step 4: Complete
-            setLoading(false);
-            setCurrentStep('');
+
+            const ws = new WebSocket(`${wsUrl}/api/ws/summarize`);
+
+            ws.onopen = () => {
+                ws.send(JSON.stringify({
+                    urls,
+                    api_key: apiKey,
+                    articles: selectedArticles
+                }));
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'progress') {
+                        setProgressData({
+                            completed: data.completed,
+                            total: data.total,
+                            currentArticle: data.current_article,
+                            status: data.status
+                        });
+                    } else if (data.type === 'complete') {
+                        setSummary(data.summary);
+                        setCurrentProgressStep(4); // Step 4: Complete
+                        setLoading(false);
+                        setCurrentStep('');
+                        ws.close();
+                    } else if (data.type === 'error') {
+                        setError(data.message);
+                        setLoading(false);
+                        ws.close();
+                    }
+                } catch (e) {
+                    console.error("Error parsing WS message:", e);
+                }
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket Error:', error);
+                setError('Lỗi kết nối WebSocket server.');
+                setLoading(false);
+            };
+
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Đã xảy ra lỗi khi tóm tắt');
             setLoading(false);
@@ -353,7 +414,16 @@ export default function Home() {
                 {/* Loading State */}
                 {loading && (
                     <div className="animate-slide-up">
-                        <LoadingSpinner text={currentStep} />
+                        {currentProgressStep === 3 ? (
+                            <SummarizationProgress
+                                completed={progressData.completed}
+                                total={progressData.total}
+                                currentArticle={progressData.currentArticle}
+                                status={progressData.status}
+                            />
+                        ) : (
+                            <LoadingSpinner text={currentStep} />
+                        )}
                     </div>
                 )}
 

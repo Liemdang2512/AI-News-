@@ -36,7 +36,7 @@ class SecureRSSFetcher:
         """
         try:
             async with AsyncSession(impersonate=self.impersonate, headers=self.headers) as session:
-                response = await session.get(url, timeout=timeout)
+                response = await session.get(url, timeout=timeout, allow_redirects=True)
                 
                 # Check for cookie challenge (Lao Dong specific)
                 # Response usually contains: document.cookie="KEY=VALUE"+...

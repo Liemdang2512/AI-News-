@@ -1,6 +1,8 @@
-from fastapi import APIRouter, HTTPException, Header
+from fastapi import APIRouter, HTTPException, Header, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 from typing import List, Optional
+import json
+import asyncio
 from services.rss_matcher import rss_matcher
 from services.rss_fetcher import rss_fetcher
 from services.categorizer import categorizer
@@ -108,7 +110,8 @@ async def summarize_articles(
             for article in request.articles:
                 articles_metadata[article.url] = {
                     'source': article.source,
-                    'category': article.category
+                    'category': article.category,
+                    'title': article.title
                 }
         
         summary = await summarizer.summarize_articles(
@@ -119,3 +122,70 @@ async def summarize_articles(
         return SummarizeResponse(summary=summary)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.websocket("/ws/summarize")
+async def websocket_summarize(websocket: WebSocket):
+    await websocket.accept()
+    try:
+        # Receive input data
+        data = await websocket.receive_json()
+        urls = data.get("urls", [])
+        api_key = data.get("api_key")
+        articles_data = data.get("articles", [])
+        
+        # Convert articles_data to dict for easier lookup
+        articles_metadata = {}
+        for article in articles_data:
+            clean_url = article['url'].strip().rstrip('/')
+            articles_metadata[clean_url] = {
+                'source': article.get('source'),
+                'category': article.get('category'),
+                'title': article.get('title')
+            }
+            
+        async def progress_callback(completed: int, total: int, url: str, status: str):
+            await websocket.send_json({
+                "type": "progress",
+                "completed": completed,
+                "total": total,
+                "current_article": url,
+                "status": status
+            })
+
+        # Keep-alive task to prevent connection timeout during heavy processing
+        async def keep_alive():
+            while True:
+                await asyncio.sleep(5)
+                try:
+                    await websocket.send_json({"type": "ping"})
+                except:
+                    break
+        
+        keep_alive_task = asyncio.create_task(keep_alive())
+            
+        try:
+            summary = await summarizer.summarize_articles(
+                urls, 
+                api_key=api_key, 
+                articles_metadata=articles_metadata,
+                progress_callback=progress_callback
+            )
+        finally:
+            keep_alive_task.cancel()
+        
+        await websocket.send_json({
+            "type": "complete",
+            "summary": summary
+        })
+        
+        await websocket.close()
+            
+    except WebSocketDisconnect:
+        print("WebSocket disconnected")
+    except Exception as e:
+        print(f"WebSocket error: {e}")
+        try:
+            await websocket.send_json({"type": "error", "message": str(e)})
+            await websocket.close()
+        except:
+            pass
