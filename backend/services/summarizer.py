@@ -136,10 +136,11 @@ class Summarizer:
         for cat in priority_order:
             articles_list = categorized_results.get(cat, [])
             if articles_list:
-                final_summary += f"## {cat}\n\n"
+                final_summary += f"## {cat} ({len(articles_list)} bài)\n\n"
                 for idx, article_text in enumerate(articles_list, 1):
                     final_summary += f"{article_text}\n\n"
                 final_summary += "---\n\n"
+
         
         if failed_articles:
              final_summary += f"### ⚠️ Không thể tóm tắt ({len(failed_articles)} bài)\n"
