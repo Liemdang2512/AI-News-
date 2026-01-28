@@ -9,13 +9,16 @@ interface InputFormProps {
 }
 
 const availableNewspapers = [
-    // 'Lao Động',
+    'Lao Động',
     'Dân Trí',
     'VTV',
-    // 'Hà Nội Mới',
+    'Hà Nội Mới',
     'Sài Gòn Giải Phóng',
     'VietnamPlus',
-    'Tiền Phong'
+    'Tiền Phong',
+    // 'Báo VOV',
+    'Báo tin tức',
+    'Báo tuổi trẻ'
 ];
 
 export default function InputForm({ onSubmit, loading }: InputFormProps) {

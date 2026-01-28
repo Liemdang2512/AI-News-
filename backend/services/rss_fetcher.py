@@ -25,6 +25,8 @@ class RSSFetcher:
         "vnexpress.net": "VNS EXPRESS",
         "tuoitre.vn": "TUỔI TRẺ",
         "cafef.vn": "CAFEF",
+        "vov.vn": "VOV",
+        "baotintuc.vn": "BÁO TIN TỨC",
     }
     
     async def fetch_and_filter(

@@ -37,6 +37,27 @@ class SecureRSSFetcher:
         try:
             async with AsyncSession(impersonate=self.impersonate, headers=self.headers) as session:
                 response = await session.get(url, timeout=timeout)
+                
+                # Check for cookie challenge (Lao Dong specific)
+                # Response usually contains: document.cookie="KEY=VALUE"+...
+                if "document.cookie" in response.text and "window.location.reload" in response.text:
+                    import re
+                    # Extract cookie key and value
+                    # Look for pattern: document.cookie="KEY=VALUE"
+                    # Simple regex to catch the first assignment
+                    match = re.search(r'document\.cookie="([^"]+)"', response.text)
+                    if match:
+                        cookie_str = match.group(1)
+                        if "=" in cookie_str:
+                            key, value = cookie_str.split("=", 1)
+                            # Clean up value (sometimes has extra chars if not parsed perfectly, but usually clean)
+                            # Add cookie to session
+                            session.cookies.set(key, value)
+                            
+                            print(f"🔄 Detected cookie challenge for {url}. Retrying with cookie: {key}={value[:10]}...")
+                            # Retry request
+                            response = await session.get(url, timeout=timeout)
+                            
                 return response.text
         except Exception as e:
             print(f"❌ Error fetching {url}: {str(e)}")

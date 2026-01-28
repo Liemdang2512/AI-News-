@@ -46,6 +46,18 @@ class Settings:
         "https://tienphong.vn/rss/kinh-te-3.rss",
         "https://tienphong.vn/rss/the-gioi-5.rss",
         "https://tienphong.vn/rss/phap-luat-12.rss",
+        "https://vov.vn/rss/the-gioi.rss",
+        "https://vov.vn/rss/kinh-te.rss",
+        "https://vov.vn/rss/xa-hoi.rss",
+        "https://vov.vn/rss/phap-luat.rss",
+        "https://baotintuc.vn/the-gioi.rss",
+        "https://baotintuc.vn/kinh-te.rss",
+        "https://baotintuc.vn/xa-hoi.rss",
+        "https://baotintuc.vn/phap-luat.rss",
+        "https://tuoitre.vn/rss/phap-luat.rss",
+        "https://tuoitre.vn/rss/the-gioi.rss",
+        "https://tuoitre.vn/rss/kinh-doanh.rss",
+        "https://tuoitre.vn/rss/thoi-su.rss",
     ]
 
 

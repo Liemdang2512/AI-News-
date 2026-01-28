@@ -141,3 +141,38 @@ XÃ HỘI
 PHÁP LUẬT
 """
 
+
+# Prompt tóm tắt từng bài viết đơn lẻ (cho xử lý song song)
+
+
+SINGLE_ARTICLE_SUMMARIZE_PROMPT = """# VAI TRÒ
+Hãy đóng vai phóng viên báo Nhân Dân. Dựa trên dữ liệu gốc được cung cấp, hãy viết một tin ngắn từ 130 đến 150 chữ.
+
+# DỮ LIỆU ĐẦU VÀO
+Tiêu đề gốc: {title}
+Nội dung: 
+{content}
+
+# YÊU CẦU VỀ NỘI DUNG VÀ VĂN PHONG
+1. **Văn phong:** Chuẩn mực, trang trọng, chính luận; lập luận chặt chẽ; lồng ghép khéo léo các thuật ngữ quản lý nhà nước hoặc phát triển bền vững.
+2. **Cấu trúc:** Nội dung đầy đủ các thông tin cốt lõi (Ai, cái gì, ở đâu, khi nào, tại sao).
+3. **Hình thức:** Câu văn mạch lạc, đúng ngữ pháp, không dùng từ lóng hay giật tít.
+
+# QUY ĐỊNH VỀ ĐỊNH DẠNG (FORMATTING RULES) - BẮT BUỘC
+Bạn phải trả về nội dung theo định dạng Markdown CHÍNH XÁC như sau:
+
+**{title}**
+
+Nguồn: {source}
+
+[{url}]({url})
+
+- [Nội dung tin ngắn (130-150 chữ) theo phong cách báo Nhân Dân]
+
+---
+Chú ý:
+- Giữ nguyên các thông tin metadata được cung cấp (Source, URL, Title).
+- Chỉ viết nội dung tin ngắn ở phần cuối, bắt đầu bằng dấu gạch ngang (-).
+- Dòng cuối cùng không cần dấu phân cách ---
+"""
+

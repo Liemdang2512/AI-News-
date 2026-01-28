@@ -35,6 +35,14 @@ class RSSMatcher:
             "vietnam plus": "vietnamplus.vn",
             "tiền phong": "tienphong.vn",
             "tienphong": "tienphong.vn",
+            "báo vov": "vov.gov.vn",
+            "vov": "vov.gov.vn",
+            "báo tin tức": "baotintuc.vn",
+            "tin tức": "baotintuc.vn",
+            "baotintuc": "baotintuc.vn",
+            "báo tuổi trẻ": "tuoitre.vn",
+            "tuổi trẻ": "tuoitre.vn",
+            "tuoitre": "tuoitre.vn",
         }
         
         # Find matching domains
