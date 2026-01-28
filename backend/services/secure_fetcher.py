@@ -1,11 +1,20 @@
 """
 Secure RSS fetcher using curl_cffi to bypass anti-bot protection (Lao Dong, etc.)
 Replaces the heavy Playwright implementation.
+Falls back to httpx if curl_cffi is not available (Render/Vercel compatibility).
 """
 
-from curl_cffi.requests import AsyncSession
 from typing import Dict, List, Optional
 import asyncio
+
+# Try to import curl_cffi, fallback to httpx if not available
+try:
+    from curl_cffi.requests import AsyncSession
+    CURL_CFFI_AVAILABLE = True
+except ImportError:
+    print("⚠️ curl_cffi not available, falling back to httpx")
+    import httpx
+    CURL_CFFI_AVAILABLE = False
 
 class SecureRSSFetcher:
     """
@@ -25,7 +34,7 @@ class SecureRSSFetcher:
         
     async def fetch_rss(self, url: str, timeout: int = 30) -> str:
         """
-        Fetch RSS feed content using curl_cffi
+        Fetch RSS feed content using curl_cffi (with httpx fallback)
         
         Args:
             url: RSS feed URL
@@ -34,34 +43,49 @@ class SecureRSSFetcher:
         Returns:
             RSS feed content as string
         """
-        try:
-            async with AsyncSession(impersonate=self.impersonate, headers=self.headers) as session:
-                response = await session.get(url, timeout=timeout, allow_redirects=True)
-                
-                # Check for cookie challenge (Lao Dong specific)
-                # Response usually contains: document.cookie="KEY=VALUE"+...
-                if "document.cookie" in response.text and "window.location.reload" in response.text:
-                    import re
-                    # Extract cookie key and value
-                    # Look for pattern: document.cookie="KEY=VALUE"
-                    # Simple regex to catch the first assignment
-                    match = re.search(r'document\.cookie="([^"]+)"', response.text)
-                    if match:
-                        cookie_str = match.group(1)
-                        if "=" in cookie_str:
-                            key, value = cookie_str.split("=", 1)
-                            # Clean up value (sometimes has extra chars if not parsed perfectly, but usually clean)
-                            # Add cookie to session
-                            session.cookies.set(key, value)
-                            
-                            print(f"🔄 Detected cookie challenge for {url}. Retrying with cookie: {key}={value[:10]}...")
-                            # Retry request
-                            response = await session.get(url, timeout=timeout)
-                            
-                return response.text
-        except Exception as e:
-            print(f"❌ Error fetching {url}: {str(e)}")
-            return ""
+        # Use curl_cffi if available, otherwise fallback to httpx
+        if CURL_CFFI_AVAILABLE:
+            try:
+                async with AsyncSession(impersonate=self.impersonate, headers=self.headers) as session:
+                    response = await session.get(url, timeout=timeout, allow_redirects=True)
+                    
+                    # Check for cookie challenge (Lao Dong specific)
+                    # Response usually contains: document.cookie="KEY=VALUE"+...
+                    if "document.cookie" in response.text and "window.location.reload" in response.text:
+                        import re
+                        # Extract cookie key and value
+                        # Look for pattern: document.cookie="KEY=VALUE"
+                        # Simple regex to catch the first assignment
+                        match = re.search(r'document\.cookie="([^"]+)"', response.text)
+                        if match:
+                            cookie_str = match.group(1)
+                            if "=" in cookie_str:
+                                key, value = cookie_str.split("=", 1)
+                                # Clean up value (sometimes has extra chars if not parsed perfectly, but usually clean)
+                                # Add cookie to session
+                                session.cookies.set(key, value)
+                                
+                                print(f"🔄 Detected cookie challenge for {url}. Retrying with cookie: {key}={value[:10]}...")
+                                # Retry request
+                                response = await session.get(url, timeout=timeout)
+                                
+                    return response.text
+            except Exception as e:
+                print(f"❌ curl_cffi error for {url}: {str(e)}")
+                return ""
+        else:
+            # Fallback to httpx (for Vercel/serverless environments)
+            try:
+                async with httpx.AsyncClient(
+                    timeout=timeout,
+                    follow_redirects=True,
+                    headers=self.headers
+                ) as client:
+                    response = await client.get(url)
+                    return response.text
+            except Exception as e:
+                print(f"❌ httpx error for {url}: {str(e)}")
+                return ""
     
     async def fetch_multiple_rss(self, urls: list[str]) -> dict[str, str]:
         """
