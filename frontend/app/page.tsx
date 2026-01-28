@@ -162,58 +162,79 @@ export default function Home() {
         try {
             setCurrentStep('Đang tóm tắt bài viết...');
 
-            // Construct WebSocket URL
-            let wsUrl = API_BASE_URL;
-            if (!wsUrl || wsUrl === '') {
-                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-                wsUrl = `${protocol}//${window.location.host}`;
-            } else {
-                wsUrl = wsUrl.replace(/^http/, 'ws');
+            setCurrentStep('Đang tóm tắt bài viết...');
+
+            // Use streaming fetch instead of WebSocket (better for Vercel)
+            const response = await fetch(`${API_BASE_URL}/api/articles/summarize_stream`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Gemini-API-Key': apiKey || '',
+                    'Accept': 'application/x-ndjson'
+                },
+                body: JSON.stringify({
+                    urls,
+                    articles: selectedArticles
+                })
+            });
+
+            // Handle stream
+            const reader = response.body?.getReader();
+            if (!reader) throw new Error('Không thể đọc stream từ server');
+
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+
+                // Process all complete lines
+                buffer = lines.pop() || ''; // Keep the last incomplete line in buffer
+
+                for (const line of lines) {
+                    if (!line.trim()) continue;
+                    try {
+                        const data = JSON.parse(line);
+
+                        if (data.type === 'progress') {
+                            setProgressData({
+                                completed: data.completed,
+                                total: data.total,
+                                currentArticle: data.current_article,
+                                status: data.status
+                            });
+                        } else if (data.type === 'complete') {
+                            setSummary(data.summary);
+                            setCurrentProgressStep(4);
+                            setLoading(false);
+                            setCurrentStep('');
+                        } else if (data.type === 'error') {
+                            throw new Error(data.message);
+                        }
+                    } catch (e) {
+                        console.error('Error parsing stream line:', line, e);
+                    }
+                }
             }
 
-            const ws = new WebSocket(`${wsUrl}/api/ws/summarize`);
-
-            ws.onopen = () => {
-                ws.send(JSON.stringify({
-                    urls,
-                    api_key: apiKey,
-                    articles: selectedArticles
-                }));
-            };
-
-            ws.onmessage = (event) => {
+            // Final check on buffer
+            if (buffer.trim()) {
                 try {
-                    const data = JSON.parse(event.data);
-                    if (data.type === 'progress') {
-                        setProgressData({
-                            completed: data.completed,
-                            total: data.total,
-                            currentArticle: data.current_article,
-                            status: data.status
-                        });
-                    } else if (data.type === 'complete') {
+                    const data = JSON.parse(buffer);
+                    if (data.type === 'complete') {
                         setSummary(data.summary);
-                        setCurrentProgressStep(4); // Step 4: Complete
+                        setCurrentProgressStep(4);
                         setLoading(false);
-                        setCurrentStep('');
-                        ws.close();
-                    } else if (data.type === 'error') {
-                        setError(data.message);
-                        setLoading(false);
-                        ws.close();
                     }
-                } catch (e) {
-                    console.error("Error parsing WS message:", e);
-                }
-            };
-
-            ws.onerror = (error) => {
-                console.error('WebSocket Error:', error);
-                setError('Lỗi kết nối WebSocket server.');
-                setLoading(false);
-            };
+                } catch (e) { }
+            }
 
         } catch (err) {
+            console.error('Summarize error:', err);
             setError(err instanceof Error ? err.message : 'Đã xảy ra lỗi khi tóm tắt');
             setLoading(false);
             setCurrentStep('');

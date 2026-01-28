@@ -1,7 +1,9 @@
 import asyncio
-from typing import List, Optional, Callable, Awaitable
+from typing import List, Optional, Callable, Awaitable, AsyncGenerator, Dict
+from datetime import datetime
 from bs4 import BeautifulSoup
 from services.secure_fetcher import secure_fetcher
+from services.rss_fetcher import rss_fetcher
 from services.gemini_client import gemini_client
 from prompts import SINGLE_ARTICLE_SUMMARIZE_PROMPT
 
@@ -15,13 +17,138 @@ class Summarizer:
         # Semaphore to limit concurrent tasks (avoid rate limits)
         self.semaphore = asyncio.Semaphore(10) # Process 10 articles at a time
         
-    async def summarize_articles(
+    async def summarize_articles_generator(
         self, 
         urls: List[str], 
         api_key: str = None, 
-        articles_metadata: dict = None,
-        progress_callback: Optional[Callable[[int, int, str, str], Awaitable[None]]] = None
-    ) -> str:
+        articles_metadata: dict = None
+    ) -> AsyncGenerator[Dict, None]:
+        """
+        Summarize articles and yield progress updates (for StreamingResponse)
+        Yields dicts: {'type': 'progress', ...} or {'type': 'complete', 'summary': ...}
+        """
+        if not urls:
+            yield {"type": "error", "message": "No articles selected"}
+            return
+
+        if not articles_metadata:
+            articles_metadata = {}
+
+        tasks = []
+        total = len(urls)
+        completed = 0
+        
+        # We need to process tasks and yield as they complete
+        # Create a list of coroutines
+        for url in urls:
+            clean_url = url.strip().rstrip('/')
+            metadata = articles_metadata.get(clean_url, {})
+            if not metadata:
+                metadata = articles_metadata.get(url, {})
+            
+            # Fallback logic
+            if not metadata or not metadata.get('category'):
+                inferred_category = rss_fetcher._extract_category_from_url(url)
+                if not metadata: metadata = {'source': None, 'title': None}
+                metadata['category'] = inferred_category
+
+            tasks.append(self._process_single_article(url, metadata, api_key))
+            
+        # Process in batches (BATCH_SIZE = 5) and yield progress
+        BATCH_SIZE = 5
+        all_results = []
+        
+        for i in range(0, len(tasks), BATCH_SIZE):
+            batch_tasks = tasks[i:i + BATCH_SIZE]
+            batch_urls = urls[i:i + BATCH_SIZE]
+            
+            # Current batch progress update
+            for url in batch_urls:
+                 # Try to get title for better UI
+                 meta = articles_metadata.get(url.strip().rstrip('/')) or articles_metadata.get(url) or {}
+                 title = meta.get('title', url)
+                 yield {
+                     "type": "progress",
+                     "completed": completed,
+                     "total": total,
+                     "current_article": f"Đang xử lý: {title}...",
+                     "status": "processing"
+                 }
+            
+            batch_results = await asyncio.gather(*batch_tasks)
+            all_results.extend(batch_results)
+            completed += len(batch_results)
+            
+            # Update progress after batch
+            yield {
+                "type": "progress",
+                "completed": completed,
+                "total": total,
+                "current_article": "Đang chuyển sang lô tiếp theo...",
+                "status": "processing"
+            }
+            
+            if i + BATCH_SIZE < len(tasks):
+                await asyncio.sleep(2) 
+                
+        # ... (rest of processing logic identical to summarize_articles) ...
+        # Copied logic for combining results
+        
+        results = all_results
+        
+        # Sort results by category
+        # ... (reuse logic) ...
+        # For brevity, calling internal helper or duplicating logic? 
+        # Duplicating logic is safer to avoid breaking existing method
+        
+        categorized_results = {
+            "KINH TẾ": [],
+            "TÀI CHÍNH": [],
+            "XÃ HỘI": [],
+            "PHÁP LUẬT": [],
+            "THẾ GIỚI": [],
+            "KHÁC": []
+        }
+        
+        failed_articles = []
+        
+        for res in results:
+            if "error" in res or "text" not in res:
+                 # Check if it was a fallback text result (which is a dict with category/text)
+                 if isinstance(res, dict) and "text" in res and "category" in res:
+                     # It's a valid result (fallback or normal)
+                     cat = res.get("category", "KHÁC").upper()
+                     if cat not in categorized_results: cat = "KHÁC"
+                     categorized_results[cat].append(res["text"])
+                 else:
+                     # It is a failure
+                     failed_articles.append(res)
+            else:
+                 cat = res.get("category", "KHÁC").upper()
+                 if cat not in categorized_results: cat = "KHÁC"
+                 categorized_results[cat].append(res["text"])
+
+        # Format Markdown
+        final_summary = f"# TIN TỨC TỔNG HỢP ({datetime.now().strftime('%d/%m/%Y')})\n\n"
+        
+        priority_order = ["KINH TẾ", "TÀI CHÍNH", "XÃ HỘI", "PHÁP LUẬT", "THẾ GIỚI", "KHÁC"]
+        
+        for cat in priority_order:
+            articles_list = categorized_results.get(cat, [])
+            if articles_list:
+                final_summary += f"## {cat}\n\n"
+                for idx, article_text in enumerate(articles_list, 1):
+                    final_summary += f"{article_text}\n\n"
+                final_summary += "---\n\n"
+        
+        if failed_articles:
+             final_summary += f"### ⚠️ Không thể tóm tắt ({len(failed_articles)} bài)\n"
+             # ... error details ...
+        
+        yield {
+            "type": "complete", 
+            "summary": final_summary
+        }
         """
         Fetch and summarize articles in parallel, then group by category.
         """

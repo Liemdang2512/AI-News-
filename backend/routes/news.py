@@ -123,69 +123,38 @@ async def summarize_articles(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.websocket("/ws/summarize")
-async def websocket_summarize(websocket: WebSocket):
-    await websocket.accept()
-    try:
-        # Receive input data
-        data = await websocket.receive_json()
-        urls = data.get("urls", [])
-        api_key = data.get("api_key")
-        articles_data = data.get("articles", [])
-        
-        # Convert articles_data to dict for easier lookup
-        articles_metadata = {}
-        for article in articles_data:
-            clean_url = article['url'].strip().rstrip('/')
-            articles_metadata[clean_url] = {
-                'source': article.get('source'),
-                'category': article.get('category'),
-                'title': article.get('title')
-            }
-            
-        async def progress_callback(completed: int, total: int, url: str, status: str):
-            await websocket.send_json({
-                "type": "progress",
-                "completed": completed,
-                "total": total,
-                "current_article": url,
-                "status": status
-            })
+from fastapi.responses import StreamingResponse
+import json
 
-        # Keep-alive task to prevent connection timeout during heavy processing
-        async def keep_alive():
-            while True:
-                await asyncio.sleep(5)
-                try:
-                    await websocket.send_json({"type": "ping"})
-                except:
-                    break
-        
-        keep_alive_task = asyncio.create_task(keep_alive())
+@router.post("/articles/summarize_stream")
+async def summarize_articles_stream(
+    request: SummarizeRequest,
+    x_gemini_api_key: Optional[str] = Header(None)
+):
+    """
+    Stream summarization progress and result using NDJSON formatting.
+    Vercel compatible replacement for WebSockets.
+    """
+    async def event_generator():
+        # Pass article metadata if available
+        articles_metadata = {}
+        if request.articles:
+            for article in request.articles:
+                clean_url = article.url.strip().rstrip('/')
+                articles_metadata[clean_url] = {
+                    'source': article.source,
+                    'category': article.category,
+                    'title': article.title
+                }
+
+        async for update in summarizer.summarize_articles_generator(
+            request.urls,
+            api_key=x_gemini_api_key,
+            articles_metadata=articles_metadata
+        ):
+            # Yield JSON line
+            yield json.dumps(update, ensure_ascii=False) + "\n"
+
+    return StreamingResponse(event_generator(), media_type="application/x-ndjson")
             
-        try:
-            summary = await summarizer.summarize_articles(
-                urls, 
-                api_key=api_key, 
-                articles_metadata=articles_metadata,
-                progress_callback=progress_callback
-            )
-        finally:
-            keep_alive_task.cancel()
-        
-        await websocket.send_json({
-            "type": "complete",
-            "summary": summary
-        })
-        
-        await websocket.close()
-            
-    except WebSocketDisconnect:
-        print("WebSocket disconnected")
-    except Exception as e:
-        print(f"WebSocket error: {e}")
-        try:
-            await websocket.send_json({"type": "error", "message": str(e)})
-            await websocket.close()
-        except:
-            pass
+
