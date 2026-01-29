@@ -6,6 +6,13 @@ export interface Article {
     description: string;
     source: string;  // Newspaper name (e.g., "LÃO ĐỘNG", "VTV NEWS")
     thumbnail?: string;  // Article thumbnail/image URL
+    // Phase 2: Duplicate Detection
+    group_id?: string;  // ID nhóm bài viết trùng lặp
+    is_master?: boolean;  // Bài chính trong nhóm
+    duplicate_count?: number;  // Số bài trùng lặp
+    event_summary?: string;  // Tóm tắt sự kiện
+    // Phase 2: Official Source Verification
+    official_source_link?: string | null;  // Link Báo Nhân Dân
 }
 
 export interface CategorizedArticles {

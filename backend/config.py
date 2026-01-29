@@ -58,6 +58,11 @@ class Settings:
         "https://tuoitre.vn/rss/the-gioi.rss",
         "https://tuoitre.vn/rss/kinh-doanh.rss",
         "https://tuoitre.vn/rss/thoi-su.rss",
+        # Báo Nhân Dân (Official source for verification)
+        "https://nhandan.vn/rss/kinhte-1185.rss",
+        "https://nhandan.vn/rss/phapluat-1287.rss",
+        "https://nhandan.vn/rss/xahoi-1211.rss",
+        "https://nhandan.vn/rss/thegioi-1231.rss",
     ]
 
 

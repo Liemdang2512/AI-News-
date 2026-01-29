@@ -17,7 +17,7 @@ class FastGeminiClient:
     async def generate_content(
         self,
         prompt: str,
-        model_name: str = "gemini-2.0-flash-exp",
+        model_name: str = "gemini-2.0-flash",  # Updated to requested model
         temperature: float = 0.5,
         max_tokens: int = 4096,
         api_key: str = None

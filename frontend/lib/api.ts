@@ -36,10 +36,15 @@ export const api = {
         return response.json();
     },
 
-    async fetchArticles(rss_urls: string[], date: string, time_range: string) {
+    async fetchArticles(rss_urls: string[], date: string, time_range: string, api_key?: string) {
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (api_key) {
+            headers['X-Gemini-API-Key'] = api_key;
+        }
+
         const response = await fetch(`${API_BASE_URL}/api/rss/fetch`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers,
             body: JSON.stringify({ rss_urls, date, time_range }),
         });
 

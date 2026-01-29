@@ -2,7 +2,7 @@
 
 import { Article } from '@/lib/types';
 import { useState, useMemo } from 'react';
-import { ExternalLink, Clock, ChevronDown, ChevronUp } from 'lucide-react';
+import { ExternalLink, Clock, ChevronDown, ChevronUp, CheckCircle2, Copy } from 'lucide-react';
 
 interface ArticleListProps {
     articles: Article[];
@@ -12,17 +12,23 @@ interface ArticleListProps {
 export default function ArticleList({ articles, onSelectArticles }: ArticleListProps) {
     const [selectedUrls, setSelectedUrls] = useState<string[]>([]);
     const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
+    const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
-    // Group articles by category
+    // Group articles by category, then by duplicate group
     const groupedArticles = useMemo(() => {
         const groups: Record<string, Article[]> = {};
-        articles.forEach(article => {
+
+        // Filter to show only master articles for grouping
+        const masterArticles = articles.filter(article => article.is_master !== false);
+
+        masterArticles.forEach(article => {
             const category = article.category;
             if (!groups[category]) {
                 groups[category] = [];
             }
             groups[category].push(article);
         });
+
         // Initialize all categories as expanded
         const initialExpanded: Record<string, boolean> = {};
         Object.keys(groups).forEach(cat => {
@@ -37,6 +43,20 @@ export default function ArticleList({ articles, onSelectArticles }: ArticleListP
             ...prev,
             [category]: !prev[category]
         }));
+    };
+
+    const toggleGroup = (groupId: string) => {
+        setExpandedGroups(prev => ({
+            ...prev,
+            [groupId]: !prev[groupId]
+        }));
+    };
+
+    // Get duplicate articles for a group
+    const getDuplicateArticles = (groupId: string) => {
+        return articles.filter(article =>
+            article.group_id === groupId && article.is_master === false
+        );
     };
 
     const handleToggle = (url: string) => {
@@ -166,8 +186,8 @@ export default function ArticleList({ articles, onSelectArticles }: ArticleListP
 
                                         {/* Content */}
                                         <div className="flex-1 min-w-0 space-y-2">
-                                            {/* Source and Time */}
-                                            <div className="flex items-center gap-3 text-xs">
+                                            {/* Source, Time, and Badges */}
+                                            <div className="flex items-center gap-2 text-xs flex-wrap">
                                                 <span className={`px-2 py-1 rounded border font-semibold ${getSourceColor(article.source)}`}>
                                                     {article.source}
                                                 </span>
@@ -175,12 +195,48 @@ export default function ArticleList({ articles, onSelectArticles }: ArticleListP
                                                     <Clock className="w-3 h-3" />
                                                     {article.published_at}
                                                 </span>
+
+                                                {/* Nhan Dan Verification Badge */}
+                                                {article.official_source_link && (
+                                                    <a
+                                                        href={article.official_source_link}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        className="flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 border border-green-200 rounded font-semibold hover:bg-green-100 transition-colors"
+                                                        title="Đã có trên Báo Nhân Dân"
+                                                    >
+                                                        <CheckCircle2 className="w-3 h-3" />
+                                                        Báo Nhân Dân
+                                                    </a>
+                                                )}
+
+                                                {/* Duplicate Count Badge */}
+                                                {article.duplicate_count && article.duplicate_count > 0 && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            toggleGroup(article.group_id || '');
+                                                        }}
+                                                        className="flex items-center gap-1 px-2 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded font-semibold hover:bg-amber-100 transition-colors"
+                                                    >
+                                                        <Copy className="w-3 h-3" />
+                                                        +{article.duplicate_count} nguồn khác
+                                                    </button>
+                                                )}
                                             </div>
 
                                             {/* Title */}
                                             <h4 className="font-semibold text-slate-900 leading-tight line-clamp-2">
                                                 {article.title}
                                             </h4>
+
+                                            {/* Event Summary (if available) */}
+                                            {article.event_summary && article.event_summary !== article.title && (
+                                                <p className="text-xs text-blue-600 italic">
+                                                    📌 {article.event_summary}
+                                                </p>
+                                            )}
 
                                             {/* Description */}
                                             <p className="text-sm text-slate-600 line-clamp-2">
@@ -198,6 +254,39 @@ export default function ArticleList({ articles, onSelectArticles }: ArticleListP
                                                 Xem bài viết
                                                 <ExternalLink className="w-3 h-3" />
                                             </a>
+
+                                            {/* Duplicate Articles (Expandable) */}
+                                            {article.group_id && expandedGroups[article.group_id] && (
+                                                <div className="mt-3 pt-3 border-t border-slate-200 space-y-2">
+                                                    <p className="text-xs font-semibold text-slate-600 uppercase">
+                                                        Các nguồn khác cùng tin:
+                                                    </p>
+                                                    {getDuplicateArticles(article.group_id).map((dupArticle, dupIdx) => (
+                                                        <div key={dupIdx} className="flex items-center gap-2 text-xs">
+                                                            {/* Checkbox for duplicate article */}
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={selectedUrls.includes(dupArticle.url)}
+                                                                onChange={() => handleToggle(dupArticle.url)}
+                                                                className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                                                                onClick={(e) => e.stopPropagation()}
+                                                            />
+                                                            <span className={`px-2 py-0.5 rounded border text-xs ${getSourceColor(dupArticle.source)}`}>
+                                                                {dupArticle.source}
+                                                            </span>
+                                                            <a
+                                                                href={dupArticle.url}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="text-blue-600 hover:text-blue-800 truncate flex-1"
+                                                                onClick={(e) => e.stopPropagation()}
+                                                            >
+                                                                {dupArticle.title}
+                                                            </a>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
 
                                         {/* Thumbnail */}

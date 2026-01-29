@@ -7,6 +7,7 @@ import ArticleList from '@/components/ArticleList';
 import SummaryReport from '@/components/SummaryReport';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import CategoryStats from '@/components/CategoryStats';
+import ProgressTracker from '@/components/ProgressTracker';
 import { api, API_BASE_URL } from '@/lib/api';
 import { Article } from '@/lib/types';
 import SummarizationProgress from '@/components/SummarizationProgress';
@@ -25,6 +26,13 @@ export default function Home() {
 
     // Progress tracking: 0=initial, 1=searched, 2=articles loaded, 3=generating summary, 4=complete
     const [currentProgressStep, setCurrentProgressStep] = useState(0);
+
+    // Process steps for real-time tracking
+    const [processSteps, setProcessSteps] = useState([
+        { id: 'fetch_rss', label: 'Tải dữ liệu RSS', status: 'pending' as const, message: '' },
+        { id: 'dedup', label: 'Phân tích trùng lặp', status: 'pending' as const, message: '' },
+        { id: 'verification', label: 'Xác thực Báo Nhân Dân', status: 'pending' as const, message: '' },
+    ]);
 
     // API Key Settings
     const [apiKey, setApiKey] = useState('');
@@ -102,6 +110,13 @@ export default function Home() {
         setSearchMetadata(null);
         setCurrentProgressStep(1); // Step 1: Searching
 
+        // Reset process steps
+        setProcessSteps([
+            { id: 'fetch_rss', label: 'Tải dữ liệu RSS', status: 'pending', message: '' },
+            { id: 'dedup', label: 'Phân tích trùng lặp', status: 'pending', message: '' },
+            { id: 'verification', label: 'Xác thực Báo Nhân Dân', status: 'pending', message: '' },
+        ]);
+
         try {
             setCurrentStep('Đang khớp nguồn RSS...');
             const matchResponse = await api.matchRSS(data.newspapers);
@@ -113,24 +128,108 @@ export default function Home() {
                 return;
             }
 
-            setCurrentStep('Đang tải và lọc bài viết...');
-            const fetchResponse = await api.fetchArticles(
-                matchResponse.rss_feeds,
-                data.date,
-                data.timeRange
-            );
-
-            setArticles(fetchResponse.articles);
-            setSearchMetadata({
-                date: data.date,
-                timeRange: data.timeRange,
-                totalArticles: fetchResponse.articles.length
+            // Use streaming endpoint
+            setCurrentStep('Đang xử lý...');
+            const response = await fetch(`${API_BASE_URL}/api/rss/fetch_stream`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(apiKey ? { 'X-Gemini-API-Key': apiKey } : {})
+                },
+                body: JSON.stringify({
+                    rss_urls: matchResponse.rss_feeds,
+                    date: data.date,
+                    time_range: data.timeRange
+                })
             });
-            setCurrentProgressStep(2); // Step 2: Articles loaded
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch articles');
+            }
+
+            const reader = response.body?.getReader();
+            const decoder = new TextDecoder();
+
+            if (!reader) {
+                throw new Error('No response body');
+            }
+
+            let buffer = ''; // Buffer for incomplete chunks
+            let articlesReceived = false;
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) {
+                    console.log('Stream ended. Articles received:', articlesReceived);
+                    break;
+                }
+
+                // Decode and add to buffer
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+
+                // Keep the last incomplete line in buffer
+                buffer = lines.pop() || '';
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        const jsonData = line.slice(6);
+                        try {
+                            const event = JSON.parse(jsonData);
+
+                            console.log('SSE Event:', event.step, event.status, event.message?.substring(0, 50));
+
+                            // Update process steps
+                            setProcessSteps(prev => prev.map(step => {
+                                if (step.id === event.step) {
+                                    return {
+                                        ...step,
+                                        status: event.status,
+                                        message: event.message || ''
+                                    };
+                                }
+                                return step;
+                            }));
+
+                            // Handle complete event
+                            if (event.step === 'complete' && event.articles) {
+                                console.log('✅ Received articles:', event.articles.length);
+                                articlesReceived = true;
+                                setArticles(event.articles);
+                                setSearchMetadata({
+                                    date: data.date,
+                                    timeRange: data.timeRange,
+                                    totalArticles: event.articles.length
+                                });
+                                setCurrentProgressStep(2);
+                                setLoading(false); // Clear loading immediately
+                                setCurrentStep('');
+                            }
+
+                            // Handle error
+                            if (event.step === 'error') {
+                                console.error('❌ SSE Error:', event.message);
+                                setError(event.message);
+                                setLoading(false);
+                                setCurrentStep('');
+                            }
+
+                        } catch (e) {
+                            console.error('Failed to parse SSE event:', e, 'Line:', line.substring(0, 100));
+                        }
+                    }
+                }
+            }
+
+            // Ensure loading is cleared even if no complete event
+            if (!articlesReceived) {
+                console.warn('⚠️ Stream ended without receiving articles');
+            }
             setLoading(false);
             setCurrentStep('');
 
         } catch (err) {
+            console.error('Search error:', err);
             setError(err instanceof Error ? err.message : 'Đã xảy ra lỗi không xác định');
             setLoading(false);
             setCurrentStep('');
@@ -442,6 +541,8 @@ export default function Home() {
                                 currentArticle={progressData.currentArticle}
                                 status={progressData.status}
                             />
+                        ) : currentProgressStep === 1 ? (
+                            <ProgressTracker steps={processSteps} />
                         ) : (
                             <LoadingSpinner text={currentStep} />
                         )}
