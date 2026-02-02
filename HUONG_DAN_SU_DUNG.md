@@ -20,7 +20,7 @@ Chào mừng bạn đến với ứng dụng **AI News Assistant**. Tài liệu 
 
 ## 2. Cấu hình ứng dụng
 
-Sau khi đã có chìa khóa (API Key), hãy mở ứng dụng tin tức lên (thường ở địa chỉ `http://localhost:3000`).
+Khi đã có chìa khóa (API Key), hãy mở ứng dụng tin tức lên 
 
 **Bước 1:** Tại màn hình chính, bạn sẽ thấy khung "Cấu hình API" hoặc nút "Chỉnh sửa" nếu đã từng nhập trước đó.
 

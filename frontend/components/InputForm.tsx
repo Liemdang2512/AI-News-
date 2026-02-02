@@ -35,12 +35,13 @@ export default function InputForm({ onSubmit, loading }: InputFormProps) {
     const [timeRange, setTimeRange] = useState('6h00 đến 8h00');
 
     const timeRanges = [
-
+        '00h00 đến 6h00',
         '6h00 đến 8h00',
         '8h00 đến 11h00',
         '11h00 đến 14h00',
         '14h00 đến 17h00',
         '17h00 đến 21h00',
+        '21h00 đến 23h59',
     ];
 
     // Click outside to close dropdown

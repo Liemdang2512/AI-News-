@@ -185,9 +185,18 @@ class RSSFetcher:
                 return None
             
             # Check if time is within range
+            # Handle both normal ranges (6h-8h) and cross-midnight ranges (21h-23h59, 0h-6h)
             pub_time = pub_date.time()
-            if not (start_time <= pub_time <= end_time):
-                return None
+            
+            # Normal time range (start < end, e.g., 6h00 to 8h00)
+            if end_time >= start_time:
+                if not (start_time <= pub_time <= end_time):
+                    return None
+            # Cross-midnight range (end < start, e.g., 21h00 to 6h00) - NOT USED currently
+            # but kept for future flexibility
+            else:
+                if not (pub_time >= start_time or pub_time <= end_time):
+                    return None
             
             # Extract newspaper source from RSS URL
             source = self._extract_source(rss_url)
