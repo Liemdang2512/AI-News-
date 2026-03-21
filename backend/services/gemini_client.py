@@ -1,4 +1,4 @@
-
+from config import settings
 from services.fast_gemini import fast_gemini
 
 class GeminiClient:
@@ -8,7 +8,7 @@ class GeminiClient:
     def generate_content(
         self,
         prompt: str,
-        model_name: str = "gemini-2.0-flash-exp",
+        model_name: str = None,
         temperature: float = 0.5,
         max_tokens: int = 4096,
         api_key: str = None
@@ -50,7 +50,7 @@ class GeminiClient:
     async def async_generate_content(
         self,
         prompt: str,
-        model_name: str = "gemini-2.0-flash-exp",
+        model_name: str = None,
         temperature: float = 0.5,
         max_tokens: int = 4096,
         api_key: str = None

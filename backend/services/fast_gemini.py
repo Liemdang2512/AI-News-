@@ -9,7 +9,7 @@ class FastGeminiClient:
     Replaces the heavy google-generativeai SDK.
     """
     
-    BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
+    BASE_URL = "https://generativelanguage.googleapis.com/v1/models"
     
     def __init__(self):
         self.api_key = settings.GEMINI_API_KEY
@@ -17,7 +17,7 @@ class FastGeminiClient:
     async def generate_content(
         self,
         prompt: str,
-        model_name: str = "gemini-2.0-flash",  # Updated to requested model
+        model_name: str = None,
         temperature: float = 0.5,
         max_tokens: int = 4096,
         api_key: str = None
@@ -28,13 +28,22 @@ class FastGeminiClient:
         key = api_key if api_key else self.api_key
         if not key:
             raise Exception("Gemini API Key is missing")
-            
-        url = f"{self.BASE_URL}/{model_name}:generateContent?key={key}"
+
+        resolved_model = model_name or settings.GEMINI_MODEL
+        url = f"{self.BASE_URL}/{resolved_model}:generateContent?key={key}"
         
         headers = {
             "Content-Type": "application/json"
         }
         
+        # Tin tức thường có từ khóa “nhạy cảm” theo ngữ cảnh; BLOCK_ONLY_HIGH giảm chặn nhầm
+        safety_settings = [
+            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_ONLY_HIGH"},
+            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_ONLY_HIGH"},
+            {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_ONLY_HIGH"},
+            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_ONLY_HIGH"},
+        ]
+
         payload = {
             "contents": [{
                 "parts": [{"text": prompt}]
@@ -42,28 +51,49 @@ class FastGeminiClient:
             "generationConfig": {
                 "temperature": temperature,
                 "maxOutputTokens": max_tokens
-            }
+            },
+            "safetySettings": safety_settings,
         }
         
         async with httpx.AsyncClient() as client:
             try:
-                response = await client.post(url, headers=headers, json=payload, timeout=60.0)
+                timeout = settings.GEMINI_REQUEST_TIMEOUT
+                response = await client.post(url, headers=headers, json=payload, timeout=timeout)
                 
                 if response.status_code != 200:
                     error_text = response.text
                     raise Exception(f"Gemini API Error ({response.status_code}): {error_text}")
                 
                 data = response.json()
-                
-                # Extract text from response
-                try:
-                    text = data['candidates'][0]['content']['parts'][0]['text']
-                    return text
-                except (KeyError, IndexError):
-                    # Handle safety blocks or empty responses
-                    if 'promptFeedback' in data:
-                        return f"Blocked by safety filters: {json.dumps(data['promptFeedback'])}"
-                    return ""
+
+                candidates = data.get("candidates") or []
+                if not candidates:
+                    pf = data.get("promptFeedback")
+                    if pf:
+                        raise Exception(
+                            f"Gemini không trả về candidates: {json.dumps(pf, ensure_ascii=False)[:800]}"
+                        )
+                    raise Exception(
+                        f"Gemini response không có candidates: {json.dumps(data, ensure_ascii=False)[:600]}"
+                    )
+
+                c0 = candidates[0]
+                parts = (c0.get("content") or {}).get("parts") or []
+                texts: list[str] = []
+                for p in parts:
+                    if isinstance(p, dict) and p.get("text"):
+                        texts.append(p["text"])
+                text = "".join(texts).strip()
+
+                if not text:
+                    fr = c0.get("finishReason")
+                    pf = data.get("promptFeedback")
+                    hint = f" finishReason={fr!r}"
+                    if pf:
+                        hint += f" promptFeedback={json.dumps(pf, ensure_ascii=False)[:500]}"
+                    raise Exception(f"Gemini trả về candidate rỗng.{hint}")
+
+                return text
                     
             except Exception as e:
                 raise Exception(f"FastGeminiClient Error: {str(e)}")

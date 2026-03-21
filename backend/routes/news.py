@@ -12,7 +12,19 @@ from services.article_categorizer import article_categorizer
 from services.dedup_service import dedup_service
 from services.nhandan_fetcher import nhandan_fetcher
 
+import httpx
+
 router = APIRouter(prefix="/api", tags=["news"])
+
+@router.get("/models")
+async def list_models(x_gemini_api_key: Optional[str] = Header(None)):
+    """List available Gemini models"""
+    key = x_gemini_api_key
+    if not key:
+        raise HTTPException(status_code=400, detail="Missing X-Gemini-API-Key header")
+    async with httpx.AsyncClient() as client:
+        r = await client.get(f"https://generativelanguage.googleapis.com/v1beta/models?key={key}", timeout=10.0)
+        return r.json()
 
 # Request/Response Models
 class MatchRSSRequest(BaseModel):
@@ -212,10 +224,13 @@ async def summarize_articles(
         articles_metadata = {}
         if request.articles:
             for article in request.articles:
-                articles_metadata[article.url] = {
-                    'source': article.source,
-                    'category': article.category,
-                    'title': article.title
+                clean = article.url.strip().rstrip("/")
+                articles_metadata[clean] = {
+                    "source": article.source,
+                    "category": article.category,
+                    "title": article.title,
+                    "description": article.description or "",
+                    "event_summary": article.event_summary or "",
                 }
         
         summary = await summarizer.summarize_articles(
@@ -244,11 +259,13 @@ async def summarize_articles_stream(
         articles_metadata = {}
         if request.articles:
             for article in request.articles:
-                clean_url = article.url.strip().rstrip('/')
+                clean_url = article.url.strip().rstrip("/")
                 articles_metadata[clean_url] = {
-                    'source': article.source,
-                    'category': article.category,
-                    'title': article.title
+                    "source": article.source,
+                    "category": article.category,
+                    "title": article.title,
+                    "description": article.description or "",
+                    "event_summary": article.event_summary or "",
                 }
 
         async for update in summarizer.summarize_articles_generator(

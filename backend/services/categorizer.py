@@ -1,4 +1,5 @@
 from typing import List, Dict
+from config import settings
 from services.gemini_client import gemini_client
 from prompts import CATEGORIZE_PROMPT
 
@@ -24,7 +25,7 @@ class Categorizer:
         try:
             response = await gemini_client.async_generate_content(
                 prompt=prompt,
-                model_name="gemini-2.0-flash",
+                model_name=settings.GEMINI_MODEL,
                 temperature=0,
                 max_tokens=30000
             )

@@ -1,4 +1,5 @@
 from typing import List, Dict
+from config import settings
 from services.gemini_client import gemini_client
 from prompts import ARTICLE_CATEGORIZE_PROMPT
 import asyncio
@@ -11,7 +12,7 @@ class ArticleCategorizer:
     
     VALID_CATEGORIES = ["KINH TẾ", "TÀI CHÍNH", "XÃ HỘI", "PHÁP LUẬT"]
     
-    def categorize_article(self, title: str, description: str) -> str:
+    async def categorize_article(self, title: str, description: str) -> str:
         """
         Categorize a single article based on title and description
         
@@ -33,11 +34,11 @@ class ArticleCategorizer:
         )
         
         try:
-            response = gemini_client.generate_content(
+            response = await gemini_client.async_generate_content(
                 prompt=prompt,
-                model_name="gemini-2.0-flash",
+                model_name=settings.GEMINI_MODEL,
                 temperature=0,
-                max_tokens=50
+                max_tokens=50,
             )
             
             # Clean and validate response
@@ -77,7 +78,7 @@ class ArticleCategorizer:
             batch = articles[i:i + batch_size]
             
             for article in batch:
-                category = self.categorize_article(
+                category = await self.categorize_article(
                     article.get('title', ''),
                     article.get('description', '')
                 )

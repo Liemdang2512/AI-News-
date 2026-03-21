@@ -6,6 +6,7 @@ Lấy RSS từ Báo Nhân Dân và đối chiếu nội dung
 import asyncio
 from typing import List, Dict, Optional
 from datetime import datetime, timedelta
+from config import settings
 from services.secure_fetcher import secure_fetcher
 import feedparser
 import json
@@ -218,7 +219,7 @@ Trả về kết quả dưới dạng JSON Array, không kèm lời giải thíc
         try:
             response = await fast_gemini.generate_content(
                 prompt=prompt,
-                model_name="gemini-2.0-flash",
+                model_name=settings.GEMINI_MODEL,
                 temperature=0.2,
                 max_tokens=1024,
                 api_key=api_key
@@ -281,7 +282,7 @@ Lưu ý: Chỉ trả về true nếu chắc chắn 2 bài viết về cùng sự
         try:
             response = await fast_gemini.generate_content(
                 prompt=prompt,
-                model_name="gemini-2.0-flash",
+                model_name=settings.GEMINI_MODEL,
                 temperature=0.2,
                 max_tokens=256,
                 api_key=api_key
