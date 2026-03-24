@@ -15,6 +15,28 @@ interface SummaryReportProps {
     onBack?: () => void;
 }
 
+// Parse inline markdown (bold, italic, links) into TextRun array
+function parseInlineMarkdown(text: string, size: number): TextRun[] {
+    const runs: TextRun[] = [];
+    const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|\[[^\]]+\]\([^)]+\))/);
+    for (const part of parts) {
+        if (!part) continue;
+        if (part.startsWith('**') && part.endsWith('**')) {
+            runs.push(new TextRun({ text: part.slice(2, -2), bold: true, size }));
+        } else if (part.startsWith('*') && part.endsWith('*')) {
+            runs.push(new TextRun({ text: part.slice(1, -1), italics: true, size }));
+        } else {
+            const linkMatch = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+            if (linkMatch) {
+                runs.push(new TextRun({ text: linkMatch[1], color: '0066CC', underline: {}, size }));
+            } else {
+                runs.push(new TextRun({ text: part, size }));
+            }
+        }
+    }
+    return runs.length > 0 ? runs : [new TextRun({ text, size })];
+}
+
 export default function SummaryReport({ summary, metadata, onBack }: SummaryReportProps) {
     const handleDownload = async () => {
         try {
@@ -66,6 +88,41 @@ export default function SummaryReport({ summary, metadata, onBack }: SummaryRepo
                     paragraphs.push(new Paragraph({ text: '', spacing: { after: 100 } }));
                 } else if (trimmed === '---') {
                     paragraphs.push(new Paragraph({ text: '', spacing: { after: 200 } }));
+                } else if (trimmed.startsWith('#### ')) {
+                    const text = trimmed.substring(5).trim();
+                    paragraphs.push(
+                        new Paragraph({
+                            children: [new TextRun({ text, bold: true, size: 22 })],
+                            spacing: { before: 100, after: 80 },
+                        })
+                    );
+                } else if (trimmed.startsWith('### ')) {
+                    const text = trimmed.substring(4).trim();
+                    paragraphs.push(
+                        new Paragraph({
+                            children: [new TextRun({ text, bold: true, size: 24 })],
+                            heading: HeadingLevel.HEADING_3,
+                            spacing: { before: 150, after: 100 },
+                        })
+                    );
+                } else if (trimmed.startsWith('## ')) {
+                    const text = trimmed.substring(3).trim();
+                    paragraphs.push(
+                        new Paragraph({
+                            children: [new TextRun({ text, bold: true, size: 28 })],
+                            heading: HeadingLevel.HEADING_2,
+                            spacing: { before: 200, after: 100 },
+                        })
+                    );
+                } else if (trimmed.startsWith('# ')) {
+                    const text = trimmed.substring(2).trim();
+                    paragraphs.push(
+                        new Paragraph({
+                            children: [new TextRun({ text, bold: true, size: 32 })],
+                            heading: HeadingLevel.HEADING_1,
+                            spacing: { before: 300, after: 150 },
+                        })
+                    );
                 } else if (trimmed.includes('|') && trimmed === trimmed.toUpperCase()) {
                     // Source | Category (uppercase)
                     paragraphs.push(
@@ -74,49 +131,20 @@ export default function SummaryReport({ summary, metadata, onBack }: SummaryRepo
                             spacing: { before: 200, after: 100 },
                         })
                     );
-                } else if (trimmed.startsWith('**') && trimmed.endsWith('**')) {
-                    // Bold title
-                    const title = trimmed.replace(/\*\*/g, '');
+                } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+                    // Bullet point with inline markdown
+                    const text = trimmed.substring(2).trim();
                     paragraphs.push(
                         new Paragraph({
-                            children: [new TextRun({ text: title, bold: true, size: 24 })],
-                            spacing: { after: 100 },
-                        })
-                    );
-                } else if (trimmed.match(/^\[(.+?)\]\((.+?)\)$/)) {
-                    // Markdown link: [text](url)
-                    const match = trimmed.match(/^\[(.+?)\]\((.+?)\)$/);
-                    if (match) {
-                        const linkText = match[1];
-                        const url = match[2];
-                        paragraphs.push(
-                            new Paragraph({
-                                children: [
-                                    new TextRun({
-                                        text: url,
-                                        size: 20,
-                                        color: '0066CC',
-                                        underline: {},
-                                    })
-                                ],
-                                spacing: { after: 150 },
-                            })
-                        );
-                    }
-                } else if (trimmed.startsWith('-')) {
-                    // Bullet point
-                    const text = trimmed.substring(1).trim();
-                    paragraphs.push(
-                        new Paragraph({
-                            children: [new TextRun({ text: `• ${text}`, size: 22 })],
+                            children: [new TextRun({ text: '• ', size: 22 }), ...parseInlineMarkdown(text, 22)],
                             spacing: { after: 150 },
                         })
                     );
                 } else {
-                    // Regular text
+                    // Regular text with inline markdown
                     paragraphs.push(
                         new Paragraph({
-                            children: [new TextRun({ text: trimmed, size: 22 })],
+                            children: parseInlineMarkdown(trimmed, 22),
                             spacing: { after: 150 },
                         })
                     );
