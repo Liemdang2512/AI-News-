@@ -8,7 +8,7 @@ class Settings:
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
     # Tên model REST v1 (generativelanguage.googleapis.com/v1/models/{model}:generateContent)
     # gemini-3.0-flash-preview không tồn tại trên API công khai → mọi bài tóm tắt thất bại.
-    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.0-flash-lite")
     # Timeout HTTP cho generateContent (giây) — bài dài / mạng chậm
     GEMINI_REQUEST_TIMEOUT: float = float(os.getenv("GEMINI_REQUEST_TIMEOUT", "120"))
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
