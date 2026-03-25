@@ -145,21 +145,17 @@ PHÁP LUẬT
 # Prompt tóm tắt từng bài viết đơn lẻ (cho xử lý song song)
 
 
-SINGLE_ARTICLE_SUMMARIZE_PROMPT = """# VAI TRÒ
-Hãy đóng vai phóng viên báo Nhân Dân. Dựa trên dữ liệu gốc được cung cấp, hãy viết một tin ngắn từ 130 đến 150 chữ.
+SINGLE_ARTICLE_URL_SUMMARIZE_PROMPT = """Đọc bài báo tại URL sau: {url}
 
-# DỮ LIỆU ĐẦU VÀO
-Tiêu đề gốc: {title}
-Nội dung: 
-{content}
+Hãy đóng vai phóng viên báo Nhân Dân. Dựa trên nội dung bài báo vừa đọc, viết một tin ngắn từ 130 đến 150 chữ.
 
-# YÊU CẦU VỀ NỘI DUNG VÀ VĂN PHONG
-1. **Văn phong:** Chuẩn mực, trang trọng, chính luận; lập luận chặt chẽ; lồng ghép khéo léo các thuật ngữ quản lý nhà nước hoặc phát triển bền vững.
-2. **Cấu trúc:** Nội dung đầy đủ các thông tin cốt lõi (Ai, cái gì, ở đâu, khi nào, tại sao).
-3. **Hình thức:** Câu văn mạch lạc, đúng ngữ pháp, không dùng từ lóng hay giật tít.
+# YÊU CẦU VỀ VĂN PHONG
+1. Chuẩn mực, trang trọng, chính luận; lồng ghép khéo léo các thuật ngữ quản lý nhà nước hoặc phát triển bền vững.
+2. Nội dung đầy đủ các thông tin cốt lõi (Ai, cái gì, ở đâu, khi nào, tại sao).
+3. Câu văn mạch lạc, đúng ngữ pháp, không dùng từ lóng hay giật tít.
 
-# QUY ĐỊNH VỀ ĐỊNH DẠNG (FORMATTING RULES) - BẮT BUỘC
-Bạn phải trả về nội dung theo định dạng Markdown CHÍNH XÁC như sau:
+# ĐỊNH DẠNG BẮT BUỘC (Markdown)
+Trả về CHÍNH XÁC theo cấu trúc sau — không thêm, không bớt, không giải thích:
 
 **{title}**
 
@@ -167,9 +163,36 @@ Nguồn: {source}
 
 [{url}]({url})
 
-- [Nội dung tin ngắn (130-150 chữ) theo phong cách báo Nhân Dân]
+- Viết nội dung tin ngắn 130-150 chữ ở đây, bắt đầu bằng dấu gạch ngang này. KHÔNG dùng dấu ngoặc vuông. KHÔNG bỏ dấu gạch ngang đầu dòng.
+"""
 
----
+
+SINGLE_ARTICLE_SUMMARIZE_PROMPT = """# VAI TRÒ
+Hãy đóng vai phóng viên báo Nhân Dân. Dựa trên dữ liệu gốc được cung cấp, hãy viết một tin ngắn từ 130 đến 150 chữ.
+
+# DỮ LIỆU ĐẦU VÀO
+Tiêu đề gốc: {title}
+Nguồn: {source}
+Link bài gốc: {url}
+Nội dung:
+{content}
+
+# YÊU CẦU VỀ NỘI DUNG VÀ VĂN PHONG
+Văn phong: Chuẩn mực, trang trọng, chính luận; lập luận chặt chẽ; lồng ghép khéo léo các thuật ngữ quản lý nhà nước hoặc phát triển bền vững.
+Cấu trúc: Nội dung đầy đủ các thông tin cốt lõi (Ai, cái gì, ở đâu, khi nào, tại sao).
+Hình thức: Câu văn mạch lạc, đúng ngữ pháp, không dùng từ lóng hay giật tít.
+
+# QUY ĐỊNH VỀ ĐỊNH DẠNG (FORMATTING RULES) - BẮT BUỘC
+Trả về CHÍNH XÁC theo cấu trúc sau — không thêm, không bớt, không giải thích:
+
+{title}
+
+Nguồn: {source}
+
+{url}
+
+- Viết nội dung tin ngắn 130-150 chữ ở đây. Dòng này BẮT BUỘC bắt đầu bằng dấu gạch ngang (-). KHÔNG dùng dấu ngoặc vuông. KHÔNG bỏ dấu gạch ngang đầu dòng.
+
 Chú ý:
 - Giữ nguyên các thông tin metadata được cung cấp (Source, URL, Title).
 - Chỉ viết nội dung tin ngắn ở phần cuối, bắt đầu bằng dấu gạch ngang (-).
