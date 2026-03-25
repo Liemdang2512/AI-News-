@@ -149,6 +149,17 @@ class Summarizer:
         )
         return any(sig in low for sig in block_signals)
 
+    @staticmethod
+    def _has_bullet_content(summary: str) -> bool:
+        """Kiểm tra có ít nhất 1 dòng bullet thực sự (không phải chỉ URL có gạch ngang).
+
+        Dùng regex r'^- .{20,}' multiline thay vì '- ' in summary để tránh false-positive
+        với URL paths như https://example.com/path-to-article.
+        """
+        if not summary:
+            return False
+        return bool(re.search(r'^- .{20,}', summary, re.MULTILINE))
+
     # Các domain dùng JS nặng — dùng Playwright trước để đọc được nội dung
     _JS_HEAVY_DOMAINS = (
         "laodong.vn", "dantri.com.vn", "vtv.vn", "tuoitre.vn",
@@ -434,7 +445,7 @@ class Summarizer:
                             max_tokens=2048,
                             api_key=api_key,
                         )
-                        if summary and len(summary.strip()) > 150 and "- " in summary:
+                        if summary and len(summary.strip()) > 150 and Summarizer._has_bullet_content(summary):
                             print(f"   ✅ Summarized via URL context ({model})")
                             return {"category": category.upper(), "text": summary.strip()}
                         print(f"   ⚠️ URL context thiếu nội dung tóm tắt ({len(summary.strip()) if summary else 0} ký tự), fallback fetch: {url[:60]}")
@@ -495,7 +506,7 @@ class Summarizer:
                             max_tokens=2048,
                             api_key=api_key,
                         )
-                        if summary and len(summary.strip()) > 150 and "- " in summary:
+                        if summary and len(summary.strip()) > 150 and Summarizer._has_bullet_content(summary):
                             print(f"   ✅ Summarized via fetch fallback: {url[:50]}")
                             return {"category": category.upper(), "text": summary.strip()}
                         last_ai_error = "Phản hồi thiếu bullet tóm tắt"
@@ -524,7 +535,7 @@ class Summarizer:
                             max_tokens=1024,
                             api_key=api_key,
                         )
-                        if summary and len(summary.strip()) > 100 and "- " in summary:
+                        if summary and len(summary.strip()) > 100 and Summarizer._has_bullet_content(summary):
                             print(f"   ✅ Summarized via RSS fallback: {url[:50]}")
                             return {"category": category.upper(), "text": summary.strip()}
                     except Exception:
