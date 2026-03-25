@@ -4,11 +4,19 @@ import re
 from typing import List, Optional, Callable, Awaitable, AsyncGenerator, Dict, Any
 from datetime import datetime
 from bs4 import BeautifulSoup
+try:
+    import trafilatura as _trafilatura
+    _TRAFILATURA_AVAILABLE = True
+except ImportError:
+    _TRAFILATURA_AVAILABLE = False
+import httpx
 from config import settings
 from services.secure_fetcher import secure_fetcher
 from services.rss_fetcher import rss_fetcher
 from services.gemini_client import gemini_client
-from prompts import SINGLE_ARTICLE_SUMMARIZE_PROMPT
+from services.fast_gemini import fast_gemini
+from services.playwright_fetcher import playwright_fetcher
+from prompts import SINGLE_ARTICLE_SUMMARIZE_PROMPT, SINGLE_ARTICLE_URL_SUMMARIZE_PROMPT
 
 class Summarizer:
     """
@@ -21,6 +29,17 @@ class Summarizer:
         self.semaphore = asyncio.Semaphore(10) # Process 10 articles at a time
 
     _MIN_CHARS_TO_SUMMARIZE = 80
+    _HTTP_HEADERS = {
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/124.0.0.0 Safari/537.36"
+        ),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Cache-Control": "no-cache",
+        "Pragma": "no-cache",
+    }
 
     @staticmethod
     def _strip_html(raw: str) -> str:
@@ -73,11 +92,11 @@ class Summarizer:
     @staticmethod
     def _extract_meta_text(soup: BeautifulSoup) -> str:
         parts: List[str] = []
-        for prop in ("og:description",):
+        for prop in ("og:description", "twitter:description", "article:description"):
             m = soup.find("meta", attrs={"property": prop})
             if m and m.get("content"):
                 c = m["content"].strip()
-                if len(c) > 20:
+                if len(c) > 20 and c not in parts:
                     parts.append(c)
         m2 = soup.find("meta", attrs={"name": re.compile(r"^description$", re.I)})
         if m2 and m2.get("content"):
@@ -113,6 +132,81 @@ class Summarizer:
         if not s:
             return ""
         return str(s).replace("{", "{{").replace("}", "}}")
+
+    @staticmethod
+    def _looks_like_block_page(html: str) -> bool:
+        if not html:
+            return True
+        low = html.lower()
+        block_signals = (
+            "document.cookie",
+            "window.location.reload",
+            "checking your browser",
+            "cf-browser-verification",
+            "access denied",
+            "captcha",
+            "enable javascript and cookies to continue",
+        )
+        return any(sig in low for sig in block_signals)
+
+    # Các domain dùng JS nặng — dùng Playwright trước để đọc được nội dung
+    _JS_HEAVY_DOMAINS = (
+        "laodong.vn", "dantri.com.vn", "vtv.vn", "tuoitre.vn",
+        "vnexpress.net", "thanhnien.vn", "tienphong.vn", "vietnamplus.vn",
+        "sggp.org.vn", "hanoimoi.vn", "nhandan.vn", "baotintuc.vn", "vov.vn",
+    )
+
+    def _is_js_heavy(self, url: str) -> bool:
+        return any(d in url for d in self._JS_HEAVY_DOMAINS)
+
+    async def _fetch_article_html(self, url: str, timeout: int = 25) -> str:
+        """
+        Fetch nội dung HTML bài báo bằng nhiều cơ chế.
+        Site JS-heavy: Playwright trước. Site khác: curl_cffi → httpx → Playwright.
+        """
+        # Site dùng JS nặng: thử Playwright trước để đọc đúng nội dung
+        if self._is_js_heavy(url):
+            try:
+                html = await playwright_fetcher.fetch(url, timeout=timeout)
+                if html and len(html.strip()) > 500 and not self._looks_like_block_page(html):
+                    print(f"   🎭 Playwright (JS-heavy) thành công: {url[:60]}")
+                    return html
+            except Exception:
+                pass
+
+        # 1) Secure fetcher / curl_cffi (tốt cho site anti-bot)
+        try:
+            html = await secure_fetcher.fetch_rss(url, timeout=timeout)
+            if html and len(html.strip()) > 200 and not self._looks_like_block_page(html):
+                return html
+        except Exception:
+            pass
+
+        # 2) Fallback httpx
+        try:
+            async with httpx.AsyncClient(
+                timeout=timeout,
+                follow_redirects=True,
+                headers=self._HTTP_HEADERS,
+            ) as client:
+                resp = await client.get(url)
+                html = resp.text or ""
+                if html and len(html.strip()) > 200 and not self._looks_like_block_page(html):
+                    return html
+        except Exception:
+            pass
+
+        # 3) Playwright (site không phải JS-heavy, thử lần cuối)
+        if not self._is_js_heavy(url):
+            try:
+                html = await playwright_fetcher.fetch(url, timeout=timeout)
+                if html and len(html.strip()) > 200 and not self._looks_like_block_page(html):
+                    print(f"   🎭 Playwright thành công: {url[:60]}")
+                    return html
+            except Exception:
+                pass
+
+        return ""
 
     def _build_summarize_prompt(
         self,
@@ -302,76 +396,98 @@ class Summarizer:
                 event_plain = (metadata.get("event_summary") or "").strip()
 
                 def get_fallback_summary(note: str = "") -> str:
-                    extra = (
-                        "Không tải được nội dung đủ dài từ trang bài và không có mô tả RSS đủ để tóm tắt."
-                    )
-                    if note:
-                        extra = note
+                    # Always include a "- " bullet so output is consistent with AI summaries.
+                    # Use RSS description excerpt if available, otherwise a short note.
+                    excerpt = " ".join((rss_plain or "").split())
+                    if len(excerpt) > 400:
+                        cut = excerpt[:401]
+                        excerpt = cut.rsplit(" ", 1)[0] + "…"
+                    if excerpt:
+                        bullet = f"- {excerpt}"
+                    else:
+                        extra = note or "Không tải được nội dung đầy đủ. Mở liên kết để đọc toàn bài."
+                        bullet = f"- {extra}"
                     return (
                         f"### [{title}]({url})\n"
                         f"**Nguồn:** {source}\n\n"
-                        f"*({extra} Mở liên kết để đọc đầy đủ.)*"
+                        f"{bullet}"
                     )
 
-                # 1. Fetch trang bài + trích nội dung; ghép với mô tả RSS / tóm sự kiện nếu trang khó parse
                 await asyncio.sleep(0.5)
+                last_ai_error: Optional[str] = None
 
+                # Bước 1: Thử cho Gemini tự đọc URL qua url_context tool (v1beta)
+                url_prompt = SINGLE_ARTICLE_URL_SUMMARIZE_PROMPT.format(
+                    url=url, title=title, source=source,
+                )
+                url_models = [settings.GEMINI_MODEL]
+                url_context_ok = False
+
+                for model_attempt, model in enumerate(url_models):
+                    try:
+                        print(f"   🔗 Thử URL context ({model}): {url[:60]}")
+                        summary = await fast_gemini.generate_content_with_url(
+                            article_url=url,
+                            prompt=url_prompt,
+                            model_name=model,
+                            temperature=0.2,
+                            max_tokens=2048,
+                            api_key=api_key,
+                        )
+                        if summary and len(summary.strip()) > 150 and "- " in summary:
+                            print(f"   ✅ Summarized via URL context ({model})")
+                            return {"category": category.upper(), "text": summary.strip()}
+                        print(f"   ⚠️ URL context thiếu nội dung tóm tắt ({len(summary.strip()) if summary else 0} ký tự), fallback fetch: {url[:60]}")
+                        last_ai_error = "Phản hồi thiếu bullet tóm tắt"
+                    except Exception as e:
+                        last_ai_error = str(e)
+                        el = last_ai_error.lower()
+                        if "429" in last_ai_error or "resource exhausted" in el:
+                            await asyncio.sleep(min(32, (model_attempt + 1) * 5))
+                        print(f"   ⚠️ URL context lỗi ({model}): {last_ai_error[:200]}")
+
+                # Bước 2: Fallback — tự fetch trang + gửi nội dung cho Gemini
+                print(f"   🔄 URL context thất bại, fallback sang fetch thủ công: {url[:50]}")
                 content: Optional[str] = None
                 best_merged = ""
-                fetch_retries = 3
-                for attempt in range(fetch_retries):
+
+                for attempt in range(3):
                     try:
-                        raw_html = await secure_fetcher.fetch_rss(url)
+                        raw_html = await self._fetch_article_html(url)
                         if not raw_html or len(raw_html.strip()) < 80:
-                            if attempt < fetch_retries - 1:
+                            if attempt < 2:
                                 await asyncio.sleep(2 * (attempt + 1))
                             continue
-
                         page_extracted = self._extract_content(raw_html, limit=15000)
-                        merged = self._merge_page_and_feed(
-                            page_extracted, rss_plain, event_plain
-                        )
+                        merged = self._merge_page_and_feed(page_extracted, rss_plain, event_plain)
                         if len(merged) > len(best_merged):
                             best_merged = merged
-
                         if len(merged.strip()) >= self._MIN_CHARS_TO_SUMMARIZE:
                             content = merged
                             break
-
-                        if attempt < fetch_retries - 1:
+                        if attempt < 2:
                             await asyncio.sleep(2 * (attempt + 1))
                     except Exception as e:
-                        print(f"   ❌ Fetch error attempt {attempt+1} for {url}: {e}")
+                        print(f"   ❌ Fetch error attempt {attempt+1}: {e}")
                         await asyncio.sleep(2 * (attempt + 1))
 
                 if not content and best_merged:
                     content = best_merged
 
+                # Nếu fetch thất bại, dùng title + RSS description làm content
                 if not content or len(content.strip()) < self._MIN_CHARS_TO_SUMMARIZE:
-                    print(
-                        f"⚠️ Nội dung quá ngắn cho {url} "
-                        f"(trang ~{len(best_merged)} ký tự sau trích, RSS ~{len(rss_plain)})."
-                    )
-                    return {
-                        "category": category.upper(),
-                        "text": get_fallback_summary(),
-                    }
+                    fallback_content = f"{title}\n\n{rss_plain}".strip()
+                    if len(fallback_content) >= 60:
+                        content = fallback_content
+                        print(f"   ℹ️ Dùng title+RSS làm content ({len(content)} ký tự): {url[:50]}")
+                    else:
+                        return {"category": category.upper(), "text": get_fallback_summary()}
 
-                # 2–3. Prompt an toàn (escape { } trong nội dung) + Gemini: retry, rút ngắn nội dung khi lỗi
-                last_ai_error: Optional[str] = None
+                # Gọi Gemini với nội dung đã fetch
                 body_limits = (28000, 16000, 9000, 4500, 2000)
-
                 for ai_attempt, max_body in enumerate(body_limits):
                     try:
-                        prompt = self._build_summarize_prompt(
-                            title, content, source, category, url, max_body
-                        )
-                    except (KeyError, ValueError) as fmt_e:
-                        print(f"   ❌ Lỗi ghép prompt cho {url}: {fmt_e}")
-                        last_ai_error = str(fmt_e)
-                        break
-
-                    try:
+                        prompt = self._build_summarize_prompt(title, content, source, category, url, max_body)
                         summary = await gemini_client.async_generate_content(
                             prompt=prompt,
                             model_name=settings.GEMINI_MODEL,
@@ -379,47 +495,41 @@ class Summarizer:
                             max_tokens=2048,
                             api_key=api_key,
                         )
-                        if summary and summary.strip():
-                            print(f"   ✅ Summarized: {url[:30]}...")
-                            return {
-                                "category": category.upper(),
-                                "text": summary.strip(),
-                            }
-                        last_ai_error = "Phản hồi rỗng"
-                        print(f"   ⚠️ Gemini rỗng, thử lại (lần {ai_attempt + 1})…")
+                        if summary and len(summary.strip()) > 150 and "- " in summary:
+                            print(f"   ✅ Summarized via fetch fallback: {url[:50]}")
+                            return {"category": category.upper(), "text": summary.strip()}
+                        last_ai_error = "Phản hồi thiếu bullet tóm tắt"
                     except Exception as e:
                         last_ai_error = str(e)
                         el = last_ai_error.lower()
                         if "429" in last_ai_error or "resource exhausted" in el:
-                            wait_time = min(32, (ai_attempt + 1) * 3)
-                            print(f"   ⏳ Rate limit Gemini, chờ {wait_time}s…")
-                            await asyncio.sleep(wait_time)
+                            await asyncio.sleep(min(32, (ai_attempt + 1) * 3))
                             continue
                         if any(x in last_ai_error for x in ("503", "502", "500", "504")) or "timeout" in el:
                             await asyncio.sleep(2 + ai_attempt)
                             continue
                         if ai_attempt < len(body_limits) - 1:
-                            print(
-                                f"   ⚠️ Gemini lỗi, thử rút nội dung ({max_body}→{body_limits[ai_attempt + 1]}): "
-                                f"{last_ai_error[:180]}"
-                            )
                             await asyncio.sleep(1)
                             continue
-                        print(f"   ❌ Gemini: {last_ai_error[:400]}")
 
-                print(
-                    f"   ⚠️ AI không tóm tắt được {url[:50]}… "
-                    f"(log: {last_ai_error[:200] if last_ai_error else 'n/a'})"
-                )
-                if len(content.strip()) >= 120:
-                    return {
-                        "category": category.upper(),
-                        "text": self._excerpt_only_fallback(title, url, source, content),
-                    }
-                return {
-                    "category": category.upper(),
-                    "text": get_fallback_summary("API tóm tắt AI không phản hồi hoặc bị chặn."),
-                }
+                # Thử 1 lần cuối với RSS description ngắn — luôn yêu cầu AI tóm tắt, không hiện excerpt thô
+                short_content = f"{title}\n\n{rss_plain}".strip() if rss_plain else title
+                if short_content:
+                    try:
+                        prompt = self._build_summarize_prompt(title, short_content, source, category, url, 4000)
+                        summary = await gemini_client.async_generate_content(
+                            prompt=prompt,
+                            model_name=settings.GEMINI_MODEL,
+                            temperature=0.3,
+                            max_tokens=1024,
+                            api_key=api_key,
+                        )
+                        if summary and len(summary.strip()) > 100 and "- " in summary:
+                            print(f"   ✅ Summarized via RSS fallback: {url[:50]}")
+                            return {"category": category.upper(), "text": summary.strip()}
+                    except Exception:
+                        pass
+                return {"category": category.upper(), "text": get_fallback_summary("API tóm tắt AI không phản hồi hoặc bị chặn.")}
 
             except Exception as e:
                 print(f"❌ Error processing {url}: {str(e)}")
@@ -427,38 +537,45 @@ class Summarizer:
 
     def _extract_content(self, html: str, limit: int = 8000) -> str:
         """
-        Trích nội dung chính từ HTML: JSON-LD (articleBody), thẻ meta, rồi các vùng article phổ biến.
+        Trích nội dung chính từ HTML.
+        Layer 0: trafilatura (F1: 0.945) — nếu >= 200 chars, dùng ngay.
+        Layer 1: JSON-LD articleBody.
+        Layer 2: BS4 CSS selectors (20 selectors).
+        Layer 3: Meta tags.
         """
         try:
+            # Layer 0: trafilatura — highest precision content extraction
+            if _TRAFILATURA_AVAILABLE and html:
+                try:
+                    traf_text = _trafilatura.extract(
+                        html,
+                        include_comments=False,
+                        include_tables=False,
+                        output_format="txt",
+                        no_fallback=False,
+                    )
+                    if traf_text and len(traf_text.strip()) > 200:
+                        return traf_text.strip()[:limit]
+                except Exception:
+                    pass  # trafilatura failed, fall through to BS4
+
+            # Layer 1: JSON-LD (existing logic — unchanged)
             soup = BeautifulSoup(html, "html.parser")
             ld_text = self._extract_json_ld_text(soup)
 
             for tag in soup(["script", "style", "nav", "footer", "header", "iframe", "noscript"]):
                 tag.decompose()
 
+            # Layer 2: CSS selectors (existing logic — unchanged)
             meta_text = self._extract_meta_text(soup)
 
             main_content = None
             selectors = [
-                ".entry",
-                ".b-maincontent",
-                ".details__content",
-                ".cms-body",
-                "#article-body",
-                ".article-body",
-                ".fck_detail",
-                ".detail__content",
-                ".sapo",
-                ".post-content",
-                '[role="main"]',
-                "article",
-                ".article-content",
-                ".content-detail",
-                ".detail-content",
-                ".post_content",
-                ".body-content",
-                "#content",
-                ".content",
+                ".entry", ".b-maincontent", ".details__content", ".cms-body",
+                "#article-body", ".article-body", ".fck_detail", ".detail__content",
+                ".sapo", ".post-content", '[role="main"]', "article",
+                ".article-content", ".content-detail", ".detail-content",
+                ".post_content", ".body-content", "#content", ".content",
             ]
 
             for selector in selectors:
@@ -473,6 +590,7 @@ class Summarizer:
             selector_text = target.get_text(separator=" ", strip=True)
             selector_text = " ".join(selector_text.split())
 
+            # Layer 3: combine and return best
             candidates = [ld_text, selector_text, meta_text]
             candidates = [c for c in candidates if c and len(c.strip()) > 30]
             if not candidates:
