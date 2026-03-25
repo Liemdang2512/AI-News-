@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-03-25T02:43:37.973Z"
+last_updated: "2026-03-25T02:47:04.113Z"
 progress:
   total_phases: 1
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 4
-  completed_plans: 3
+  completed_plans: 4
 ---
 
 # Project State
@@ -31,6 +31,7 @@ Milestone 1: Quy trình đọc và tóm tắt bài viết ổn định
 - Tóm tắt theo phong cách báo Nhân Dân, 130-150 chữ
 - Output luôn có bullet "- " để đảm bảo consistency
 - [Phase 01-quy-trinh-doc-va-tom-tat]: Add trafilatura as layer 0 in _extract_content() with try/except ImportError guard for graceful degradation
+- [Phase 01-quy-trinh-doc-va-tom-tat]: Use regex r'^- .{20,}' with MULTILINE flag in _has_bullet_content to detect real bullet lines, avoiding false-positives from URL paths with dashes
 
 ## Active Phase
 
@@ -39,9 +40,9 @@ Phase 1: Quy trình đọc và tóm tắt bài viết
 ## Current Position
 
 - **Phase:** 01-quy-trinh-doc-va-tom-tat
-- **Completed Plan:** 01-02 (Playwright Timeout Reduction)
-- **Next Plan:** 01-03 (Bullet Validation + BATCH_SIZE + Prompt Hardening)
-- **Last session:** 2026-03-25T02:43:33.450Z
+- **Completed Plan:** 01-03 (Bullet Validation + BATCH_SIZE + Prompt Hardening)
+- **Next Plan:** Phase Complete — all 4 plans done
+- **Last session:** 2026-03-25T02:47:04.111Z
 
 ## Recent Decisions
 
