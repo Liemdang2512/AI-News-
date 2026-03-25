@@ -290,8 +290,8 @@ class Summarizer:
 
             tasks.append(self._process_single_article(url, metadata, api_key))
             
-        # Process in batches (BATCH_SIZE = 5) and yield progress
-        BATCH_SIZE = 5
+        # Process in batches (BATCH_SIZE = 10) and yield progress
+        BATCH_SIZE = 10
         all_results = []
         
         for i in range(0, len(tasks), BATCH_SIZE):
@@ -325,7 +325,7 @@ class Summarizer:
             }
             
             if i + BATCH_SIZE < len(tasks):
-                await asyncio.sleep(2) 
+                await asyncio.sleep(0.5)
                 
         # ... (rest of processing logic identical to summarize_articles) ...
         # Copied logic for combining results
