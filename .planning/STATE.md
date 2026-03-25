@@ -20,11 +20,12 @@ Phase 1: Quy trình đọc và tóm tắt bài viết
 
 ## Current Position
 - **Phase:** 01-quy-trinh-doc-va-tom-tat
-- **Completed Plan:** 01-00 (Test Scaffold)
-- **Next Plan:** 01-01 (Content Extraction Implementation)
-- **Last session:** 2026-03-25 — Completed 01-00-PLAN.md
+- **Completed Plan:** 01-02 (Playwright Timeout Reduction)
+- **Next Plan:** 01-03 (Bullet Validation + BATCH_SIZE + Prompt Hardening)
+- **Last session:** 2026-03-25 — Completed 01-02-PLAN.md
 
 ## Recent Decisions
 - Use try/except AttributeError + pytest.skip() for future-method tests so collection never fails
 - HTML fixtures in backend/fixtures/ for unit testing without live HTTP
 - Test scaffold (plan 00) runs RED at Wave 0 — expected by design, goes GREEN as plans 01-03 implement features
+- Reduce wait_for_selector timeout from 5000ms to 2000ms — Vietnamese news sites render in 1-2s; worst-case per-article time drops from 60s to 24s

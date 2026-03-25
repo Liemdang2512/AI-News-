@@ -24,5 +24,5 @@
 Plans:
 - [x] 01-00-PLAN.md — Test scaffold: HTML fixtures + pytest test files (Wave 0) ✓ 2026-03-25
 - [ ] 01-01-PLAN.md — Trafilatura layer 0 trong _extract_content() + requirements.txt (Wave 1)
-- [ ] 01-02-PLAN.md — Playwright wait_for_selector timeout 5000ms → 2000ms (Wave 1, parallel)
+- [x] 01-02-PLAN.md — Playwright wait_for_selector timeout 5000ms → 2000ms (Wave 1, parallel) ✓ 2026-03-25
 - [ ] 01-03-PLAN.md — Bullet validation regex + BATCH_SIZE 10 + prompt hardening (Wave 2)
