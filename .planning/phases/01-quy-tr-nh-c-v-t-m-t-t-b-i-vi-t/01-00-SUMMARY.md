@@ -101,6 +101,17 @@ None - no external service configuration required.
 - Plan 01 must implement trafilatura-based extraction to make test_extract.py go GREEN
 - Plan 03 must add `_has_bullet_content` staticmethod to Summarizer to make the 3 skipped tests run GREEN
 
+## Self-Check: PASSED
+
+- FOUND: backend/fixtures/laodong_article.html
+- FOUND: backend/fixtures/dantri_article.html
+- FOUND: backend/test_extract.py
+- FOUND: backend/test_summarizer.py
+- FOUND: backend/test_prompts.py
+- FOUND: .planning/phases/01-quy-tr-nh-c-v-t-m-t-t-b-i-vi-t/01-00-SUMMARY.md
+- FOUND: commit e389185 (Task 1)
+- FOUND: commit e826fc6 (Task 2)
+
 ---
 *Phase: 01-quy-trinh-doc-va-tom-tat*
 *Completed: 2026-03-25*
