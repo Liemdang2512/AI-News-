@@ -39,5 +39,5 @@ Plans:
 Plans:
 - [x] 02-00-PLAN.md — Logging test scaffold (Wave 0) (RED)
 - [x] 02-01-PLAN.md — Logger foundation + middleware request-id logging (Wave 1)
-- [ ] 02-02-PLAN.md — AI call logging (OpenAI/Gemini) + redaction (Wave 2)
+- [x] 02-02-PLAN.md — AI call logging (OpenAI/Gemini) + redaction (Wave 2)
 - [ ] 02-03-PLAN.md — Streaming progress logging + frontend basic log + docs (Wave 2)

@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-last_updated: "2026-03-26T04:12:52.197Z"
+last_updated: "2026-03-26T04:17:52.950Z"
 progress:
   total_phases: 2
   completed_phases: 1
   total_plans: 8
-  completed_plans: 6
+  completed_plans: 7
 ---
 
 # Project State
@@ -35,6 +35,8 @@ Milestone 1: Quy trình đọc và tóm tắt bài viết ổn định
 - [Phase 02-00]: Test scaffold runs with 3/4 tests GREEN at Wave 0 because X-Request-ID middleware was already in main.py; only redact_secrets test stays RED
 - [Phase 02-01]: Use contextvars.Token to reset ContextVar in finally block — prevents request_id leak between concurrent requests
 - [Phase 02-01]: app_logger uses propagate=False to prevent double-logging with uvicorn root logger
+- [Phase 02-logging-request-response]: Log api_key_present as bool, never log key string — prevents accidental secret leak in structured log fields
+- [Phase 02-logging-request-response]: safe_url computed via redact_secrets(url) before log statement — sanitisation enforced at point of use for Gemini API key in query param
 
 ## Active Phase
 
@@ -43,12 +45,12 @@ Phase 1: Quy trình đọc và tóm tắt bài viết
 ## Current Position
 
 Phase: 02 (logging-request-response) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 
 - **Phase:** 01
 - **Completed Plan:** 01-03 (Bullet Validation + BATCH_SIZE + Prompt Hardening)
 - **Next Plan:** Phase Complete — all 4 plans done
-- **Last session:** 2026-03-26T04:12:52.195Z
+- **Last session:** 2026-03-26T04:17:52.947Z
 
 ## Recent Decisions
 
