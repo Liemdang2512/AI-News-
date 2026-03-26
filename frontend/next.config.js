@@ -1,13 +1,13 @@
 /** @type {import('next').NextConfig} */
-const isProd = process.env.NODE_ENV === 'production'
+const isElectron = process.env.NEXT_OUTPUT === 'export'
 
 const nextConfig = {
     reactStrictMode: true,
-    output: 'export', // Generate static files for Electron desktop app
-    // Only use relative asset paths for production static export.
-    // In dev, this breaks CSS/JS loading on nested routes like /login.
-    ...(isProd
+    // Static export only for Electron desktop build (set NEXT_OUTPUT=export)
+    // Vercel deployment uses Next.js server mode for rewrites/proxy support
+    ...(isElectron
         ? {
+            output: 'export',
             assetPrefix: './',
             trailingSlash: true,
         }
