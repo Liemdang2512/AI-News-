@@ -4,7 +4,10 @@ from typing import List, Dict, Optional
 from datetime import datetime, time
 from dateutil import parser as date_parser
 import re
+from zoneinfo import ZoneInfo
 from services.secure_fetcher import secure_fetcher
+
+VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
 
 class RSSFetcher:
     """
@@ -198,14 +201,22 @@ class RSSFetcher:
             
             # Parse the date string (handles various formats)
             pub_date = date_parser.parse(pub_date_str)
-            
+
+            # Convert to Vietnam timezone (UTC+7) for correct date/time comparison
+            if pub_date.tzinfo is not None:
+                pub_date = pub_date.astimezone(VN_TZ)
+            else:
+                # Assume UTC if no timezone info
+                from datetime import timezone
+                pub_date = pub_date.replace(tzinfo=timezone.utc).astimezone(VN_TZ)
+
             # Check if date matches
             if pub_date.date() != target_date.date():
                 return None
-            
+
             # Check if time is within range
             # Handle both normal ranges (6h-8h) and cross-midnight ranges (21h-23h59, 0h-6h)
-            pub_time = pub_date.time()
+            pub_time = pub_date.time().replace(tzinfo=None)
             
             # Normal time range (start < end, e.g., 6h00 to 8h00)
             if end_time >= start_time:
@@ -232,7 +243,7 @@ class RSSFetcher:
                 "url": entry.get("link", ""),
                 "title": entry.get("title", ""),
                 "category": category,
-                "published_at": pub_date.strftime("%H:%M %d/%m/%Y"),
+                "published_at": pub_date.astimezone(VN_TZ).strftime("%H:%M %d/%m/%Y"),
                 "description": self._clean_description(raw_description),
                 "source": source,
                 "thumbnail": thumbnail,
