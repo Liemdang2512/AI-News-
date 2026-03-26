@@ -14,7 +14,6 @@ from config import settings
 from services.secure_fetcher import secure_fetcher
 from services.rss_fetcher import rss_fetcher
 from services.gemini_client import gemini_client
-from services.fast_gemini import fast_gemini
 from services.playwright_fetcher import playwright_fetcher
 from prompts import SINGLE_ARTICLE_SUMMARIZE_PROMPT, SINGLE_ARTICLE_URL_SUMMARIZE_PROMPT
 
@@ -427,38 +426,8 @@ class Summarizer:
                 await asyncio.sleep(0.5)
                 last_ai_error: Optional[str] = None
 
-                # Bước 1: Thử cho Gemini tự đọc URL qua url_context tool (v1beta)
-                url_prompt = SINGLE_ARTICLE_URL_SUMMARIZE_PROMPT.format(
-                    url=url, title=title, source=source,
-                )
-                url_models = [settings.GEMINI_MODEL]
-                url_context_ok = False
-
-                for model_attempt, model in enumerate(url_models):
-                    try:
-                        print(f"   🔗 Thử URL context ({model}): {url[:60]}")
-                        summary = await fast_gemini.generate_content_with_url(
-                            article_url=url,
-                            prompt=url_prompt,
-                            model_name=model,
-                            temperature=0.2,
-                            max_tokens=2048,
-                            api_key=api_key,
-                        )
-                        if summary and len(summary.strip()) > 150 and Summarizer._has_bullet_content(summary):
-                            print(f"   ✅ Summarized via URL context ({model})")
-                            return {"category": category.upper(), "text": summary.strip()}
-                        print(f"   ⚠️ URL context thiếu nội dung tóm tắt ({len(summary.strip()) if summary else 0} ký tự), fallback fetch: {url[:60]}")
-                        last_ai_error = "Phản hồi thiếu bullet tóm tắt"
-                    except Exception as e:
-                        last_ai_error = str(e)
-                        el = last_ai_error.lower()
-                        if "429" in last_ai_error or "resource exhausted" in el:
-                            await asyncio.sleep(min(32, (model_attempt + 1) * 5))
-                        print(f"   ⚠️ URL context lỗi ({model}): {last_ai_error[:200]}")
-
-                # Bước 2: Fallback — tự fetch trang + gửi nội dung cho Gemini
-                print(f"   🔄 URL context thất bại, fallback sang fetch thủ công: {url[:50]}")
+                # Bước 1: Fetch trang + gửi nội dung cho AI
+                print(f"   🔄 Fetch thủ công: {url[:50]}")
                 content: Optional[str] = None
                 best_merged = ""
 

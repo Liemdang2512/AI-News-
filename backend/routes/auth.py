@@ -20,6 +20,16 @@ from services.auth_types import (
 router = APIRouter(prefix="/api", tags=["auth"])
 
 
+@router.get("/auth/me", response_model=UserPublic)
+async def me_endpoint(current_user: Optional[UserPublic] = Depends(get_current_user)):
+    """
+    Return the currently authenticated user based on session cookie.
+    """
+    if current_user is None:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    return current_user
+
+
 @router.post("/auth/login", response_model=LoginResponse)
 async def login_endpoint(payload: LoginRequest, response: Response):
     """

@@ -2,8 +2,9 @@
 
 import { Download, Share2, Calendar, Clock } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
-import { Document, Paragraph, TextRun, HeadingLevel, AlignmentType, Packer } from 'docx';
+import { Document, Paragraph, TextRun, HeadingLevel, AlignmentType, Packer, ExternalHyperlink } from 'docx';
 import { saveAs } from 'file-saver';
+import remarkGfm from 'remark-gfm';
 
 interface SummaryReportProps {
     summary: string;
@@ -16,9 +17,9 @@ interface SummaryReportProps {
 }
 
 // Parse inline markdown (bold, italic, links) into TextRun array
-function parseInlineMarkdown(text: string, size: number): TextRun[] {
-    const runs: TextRun[] = [];
-    const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|\[[^\]]+\]\([^)]+\))/);
+function parseInlineMarkdown(text: string, size: number): Array<TextRun | ExternalHyperlink> {
+    const runs: Array<TextRun | ExternalHyperlink> = [];
+    const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|\[[^\]]+\]\([^)]+\)|https?:\/\/\S+)/);
     for (const part of parts) {
         if (!part) continue;
         if (part.startsWith('**') && part.endsWith('**')) {
@@ -28,7 +29,20 @@ function parseInlineMarkdown(text: string, size: number): TextRun[] {
         } else {
             const linkMatch = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
             if (linkMatch) {
-                runs.push(new TextRun({ text: linkMatch[1], color: '0066CC', underline: {}, size }));
+                runs.push(
+                    new ExternalHyperlink({
+                        link: linkMatch[2],
+                        children: [new TextRun({ text: linkMatch[1], color: '0066CC', underline: {}, size })],
+                    })
+                );
+            } else if (/^https?:\/\/\S+$/i.test(part)) {
+                const url = part.replace(/[),.]+$/g, (m) => (m.length ? m : ''));
+                runs.push(
+                    new ExternalHyperlink({
+                        link: url,
+                        children: [new TextRun({ text: part, color: '0066CC', underline: {}, size })],
+                    })
+                );
             } else {
                 runs.push(new TextRun({ text: part, size }));
             }
@@ -249,17 +263,23 @@ export default function SummaryReport({ summary, metadata, onBack }: SummaryRepo
                 <div className="bg-white rounded-2xl shadow-soft border border-slate-100 p-8">
                     <div className="prose prose-slate max-w-none">
                         <ReactMarkdown
+                            remarkPlugins={[remarkGfm]}
                             components={{
                                 h1: ({ children }) => (
-                                    <h2 className="flex items-center gap-3 text-xl font-bold text-corporate-blue-text mb-4 pb-3 border-b border-slate-200">
+                                    <h2 className="flex items-center gap-3 text-xl font-extrabold text-corporate-blue-text mb-4 pb-3 border-b border-slate-200">
                                         <span className="w-2 h-2 bg-vibrant-blue rounded-full"></span>
                                         {children}
                                     </h2>
                                 ),
                                 h2: ({ children }) => (
-                                    <h3 className="text-lg font-bold text-slate-800 mt-6 mb-3">
+                                    <h3 className="text-lg font-extrabold text-slate-800 mt-6 mb-3">
                                         {children}
                                     </h3>
+                                ),
+                                h3: ({ children }) => (
+                                    <h4 className="text-base font-bold text-slate-800 mt-4 mb-2">
+                                        {children}
+                                    </h4>
                                 ),
                                 p: ({ children }) => (
                                     <p className="text-slate-700 leading-relaxed mb-4">
@@ -281,6 +301,16 @@ export default function SummaryReport({ summary, metadata, onBack }: SummaryRepo
                                     <strong className="font-bold text-corporate-blue-text">
                                         {children}
                                     </strong>
+                                ),
+                                a: ({ href, children }) => (
+                                    <a
+                                        href={href}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-vibrant-blue underline hover:text-corporate-navy break-words"
+                                    >
+                                        {children}
+                                    </a>
                                 ),
                                 blockquote: ({ children }) => (
                                     <blockquote className="border-l-4 border-vibrant-blue bg-blue-50 pl-4 py-3 my-4 italic text-slate-600">

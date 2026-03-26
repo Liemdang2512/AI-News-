@@ -11,15 +11,26 @@ from services.summarizer import summarizer
 from services.article_categorizer import article_categorizer
 from services.dedup_service import dedup_service
 from services.nhandan_fetcher import nhandan_fetcher
+from services.app_logger import logger
+from services.request_context import get_request_id
 
 import httpx
+from config import settings
 
 router = APIRouter(prefix="/api", tags=["news"])
 
+def _resolve_api_key(header_key: Optional[str]) -> Optional[str]:
+    """Lấy API key từ header, fallback sang config."""
+    if header_key:
+        return header_key
+    if settings.AI_PROVIDER == "openai":
+        return settings.OPENAI_API_KEY or None
+    return settings.GEMINI_API_KEY or None
+
 @router.get("/models")
-async def list_models(x_gemini_api_key: Optional[str] = Header(None)):
+async def list_models(x_api_key: Optional[str] = Header(None)):
     """List available Gemini models"""
-    key = x_gemini_api_key
+    key = x_api_key
     if not key:
         raise HTTPException(status_code=400, detail="Missing X-Gemini-API-Key header")
     async with httpx.AsyncClient() as client:
@@ -87,7 +98,7 @@ async def match_rss_feeds(request: MatchRSSRequest):
 @router.post("/rss/fetch", response_model=FetchArticlesResponse)
 async def fetch_articles(
     request: FetchArticlesRequest,
-    x_gemini_api_key: Optional[str] = Header(None)
+    x_api_key: Optional[str] = Header(None)
 ):
     """
     Fetch RSS feeds and filter articles by date/time
@@ -106,13 +117,13 @@ async def fetch_articles(
         if len(articles) > 1:
             articles = await dedup_service.cluster_articles_semantically(
                 articles, 
-                api_key=x_gemini_api_key
+                api_key=_resolve_api_key(x_api_key)
             )
         
         # Phase 2: Check Nhan Dan official coverage (ENABLED)
         articles = await nhandan_fetcher.check_official_coverage(
             articles,
-            api_key=x_gemini_api_key
+            api_key=_resolve_api_key(x_api_key)
         )
         
         return FetchArticlesResponse(articles=articles)
@@ -123,7 +134,7 @@ async def fetch_articles(
 @router.post("/rss/fetch_stream")
 async def fetch_articles_stream(
     request: FetchArticlesRequest,
-    x_gemini_api_key: Optional[str] = Header(None)
+    x_api_key: Optional[str] = Header(None)
 ):
     """
     Streaming version of /rss/fetch with real-time progress updates
@@ -131,59 +142,77 @@ async def fetch_articles_stream(
     """
     async def event_generator():
         try:
+            _rid = get_request_id()
+            logger.info(
+                "stream.sse.started",
+                extra={"event": "stream.sse.started", "request_id": _rid, "rss_urls_count": len(request.rss_urls)}
+            )
             # Step 1: Fetch RSS
+            logger.info("stream.sse.step", extra={"event": "fetch_rss", "status": "running", "request_id": _rid})
             yield f"data: {json.dumps({'step': 'fetch_rss', 'status': 'running', 'message': f'Đang tải từ {len(request.rss_urls)} nguồn RSS...'}, ensure_ascii=False)}\n\n"
-            
+
             articles = await rss_fetcher.fetch_and_filter(
                 rss_urls=request.rss_urls,
                 target_date=request.date,
                 time_range=request.time_range
             )
             
+            logger.info("stream.sse.step", extra={"event": "fetch_rss", "status": "done", "articles_count": len(articles), "request_id": _rid})
             yield f"data: {json.dumps({'step': 'fetch_rss', 'status': 'done', 'message': f'✅ Đã tải {len(articles)} bài viết'}, ensure_ascii=False)}\n\n"
-            
+
             # Step 2: Deduplication
-            if len(articles) > 1 and x_gemini_api_key:
+            if len(articles) > 1 and x_api_key:
+                logger.info("stream.sse.step", extra={"event": "dedup", "status": "running", "request_id": _rid})
                 yield f"data: {json.dumps({'step': 'dedup', 'status': 'running', 'message': 'Đang phân tích trùng lặp (AI)...'}, ensure_ascii=False)}\n\n"
                 
                 articles = await dedup_service.cluster_articles_semantically(
                     articles, 
-                    api_key=x_gemini_api_key
+                    api_key=_resolve_api_key(x_api_key)
                 )
                 
                 # Count duplicates
                 duplicate_count = sum(1 for a in articles if a.get('duplicate_count', 0) > 0)
+                logger.info("stream.sse.step", extra={"event": "dedup", "status": "done", "duplicate_count": duplicate_count, "request_id": _rid})
                 yield f"data: {json.dumps({'step': 'dedup', 'status': 'done', 'message': f'✅ Tìm thấy {duplicate_count} nhóm trùng lặp'}, ensure_ascii=False)}\n\n"
             else:
+                logger.debug("stream.sse.step", extra={"event": "dedup", "status": "skipped", "request_id": _rid})
                 yield f"data: {json.dumps({'step': 'dedup', 'status': 'skipped', 'message': '⊘ Bỏ qua phân tích trùng lặp'}, ensure_ascii=False)}\n\n"
             
             # Step 3: Nhan Dan Verification
-            if x_gemini_api_key:
+            if x_api_key:
+                logger.info("stream.sse.step", extra={"event": "verification", "status": "running", "request_id": _rid})
                 yield f"data: {json.dumps({'step': 'verification', 'status': 'running', 'message': 'Đang xác thực Báo Nhân Dân...'}, ensure_ascii=False)}\n\n"
                 
                 articles = await nhandan_fetcher.check_official_coverage(
                     articles,
-                    api_key=x_gemini_api_key
+                    api_key=_resolve_api_key(x_api_key)
                 )
                 
                 verified_count = sum(1 for a in articles if a.get('official_source_link'))
+                logger.info("stream.sse.step", extra={"event": "verification", "status": "done", "verified_count": verified_count, "request_id": _rid})
                 yield f"data: {json.dumps({'step': 'verification', 'status': 'done', 'message': f'✅ Tìm thấy {verified_count} bài trên Báo Nhân Dân'}, ensure_ascii=False)}\n\n"
             else:
+                logger.debug("stream.sse.step", extra={"event": "verification", "status": "skipped", "request_id": _rid})
                 yield f"data: {json.dumps({'step': 'verification', 'status': 'skipped', 'message': '⊘ Bỏ qua xác thực'}, ensure_ascii=False)}\n\n"
             
             # Final: Send articles (ensure proper serialization)
             try:
                 articles_json = json.dumps({
-                    'step': 'complete', 
-                    'status': 'done', 
+                    'step': 'complete',
+                    'status': 'done',
                     'articles': articles
                 }, ensure_ascii=False, default=str)
+                logger.info("stream.sse.step", extra={"event": "complete", "status": "done", "articles_count": len(articles), "request_id": _rid})
                 yield f"data: {articles_json}\n\n"
             except Exception as json_err:
                 print(f"JSON serialization error: {json_err}")
                 yield f"data: {json.dumps({'step': 'error', 'status': 'error', 'message': f'Lỗi serialize: {str(json_err)}'}, ensure_ascii=False)}\n\n"
-            
+
         except Exception as e:
+            logger.error(
+                "stream.sse.error",
+                extra={"event": "stream.sse.error", "request_id": get_request_id(), "error": str(e)}
+            )
             yield f"data: {json.dumps({'step': 'error', 'status': 'error', 'message': str(e)}, ensure_ascii=False)}\n\n"
     
     return StreamingResponse(
@@ -213,7 +242,7 @@ async def categorize_articles(request: CategorizeRequest):
 @router.post("/articles/summarize", response_model=SummarizeResponse)
 async def summarize_articles(
     request: SummarizeRequest,
-    x_gemini_api_key: Optional[str] = Header(None)
+    x_api_key: Optional[str] = Header(None)
 ):
     """
     Fetch article content and generate AI summaries
@@ -235,7 +264,7 @@ async def summarize_articles(
         
         summary = await summarizer.summarize_articles(
             request.urls, 
-            api_key=x_gemini_api_key,
+            api_key=_resolve_api_key(x_api_key),
             articles_metadata=articles_metadata
         )
         return SummarizeResponse(summary=summary)
@@ -248,13 +277,18 @@ import json
 @router.post("/articles/summarize_stream")
 async def summarize_articles_stream(
     request: SummarizeRequest,
-    x_gemini_api_key: Optional[str] = Header(None)
+    x_api_key: Optional[str] = Header(None)
 ):
     """
     Stream summarization progress and result using NDJSON formatting.
     Vercel compatible replacement for WebSockets.
     """
     async def event_generator():
+        _rid = get_request_id()
+        logger.info(
+            "stream.ndjson.started",
+            extra={"event": "stream.ndjson.started", "request_id": _rid, "urls_count": len(request.urls)}
+        )
         # Pass article metadata if available
         articles_metadata = {}
         if request.articles:
@@ -270,9 +304,27 @@ async def summarize_articles_stream(
 
         async for update in summarizer.summarize_articles_generator(
             request.urls,
-            api_key=x_gemini_api_key,
+            api_key=_resolve_api_key(x_api_key),
             articles_metadata=articles_metadata
         ):
+            update_type = update.get("type") if isinstance(update, dict) else None
+            if update_type == "progress":
+                logger.debug(
+                    "stream.ndjson.progress",
+                    extra={"event": "stream.ndjson.progress", "request_id": _rid,
+                           "completed": update.get("completed"), "total": update.get("total")}
+                )
+            elif update_type == "complete":
+                logger.info(
+                    "stream.ndjson.complete",
+                    extra={"event": "stream.ndjson.complete", "request_id": _rid}
+                )
+            elif update_type == "error":
+                logger.error(
+                    "stream.ndjson.error",
+                    extra={"event": "stream.ndjson.error", "request_id": _rid,
+                           "error": update.get("message")}
+                )
             # Yield JSON line
             yield json.dumps(update, ensure_ascii=False) + "\n"
 

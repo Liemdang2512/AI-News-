@@ -147,7 +147,7 @@ PHÁP LUẬT
 
 SINGLE_ARTICLE_URL_SUMMARIZE_PROMPT = """Đọc bài báo tại URL sau: {url}
 
-Hãy đóng vai phóng viên báo Nhân Dân. Dựa trên nội dung bài báo vừa đọc, viết một tin ngắn từ 130 đến 150 chữ.
+Hãy đóng vai phóng viên báo Nhân Dân. Dựa trên nội dung bài báo vừa đọc, viết một tin ngắn từ 130 đến 150 từ.
 
 # YÊU CẦU VỀ VĂN PHONG
 1. Chuẩn mực, trang trọng, chính luận; lồng ghép khéo léo các thuật ngữ quản lý nhà nước hoặc phát triển bền vững.
@@ -163,12 +163,12 @@ Nguồn: {source}
 
 [{url}]({url})
 
-- Viết nội dung tin ngắn 130-150 chữ ở đây, bắt đầu bằng dấu gạch ngang này. KHÔNG dùng dấu ngoặc vuông. KHÔNG bỏ dấu gạch ngang đầu dòng.
+- Viết nội dung tin ngắn 130-150 từ ở đây, bắt đầu bằng dấu gạch ngang này. KHÔNG dùng dấu ngoặc vuông. KHÔNG bỏ dấu gạch ngang đầu dòng.
 """
 
 
 SINGLE_ARTICLE_SUMMARIZE_PROMPT = """# VAI TRÒ
-Hãy đóng vai phóng viên báo Nhân Dân. Dựa trên dữ liệu gốc được cung cấp, hãy viết một tin ngắn từ 130 đến 150 chữ.
+Hãy đóng vai phóng viên báo Nhân Dân. Dựa trên dữ liệu gốc được cung cấp, hãy viết một tin ngắn từ 130 đến 150 từ.
 
 # DỮ LIỆU ĐẦU VÀO
 Tiêu đề gốc: {title}
@@ -191,7 +191,7 @@ Nguồn: {source}
 
 {url}
 
-- Viết nội dung tin ngắn 130-150 chữ ở đây. Dòng này BẮT BUỘC bắt đầu bằng dấu gạch ngang (-). KHÔNG dùng dấu ngoặc vuông. KHÔNG bỏ dấu gạch ngang đầu dòng.
+- Viết nội dung tin ngắn 130-150 từ ở đây. Dòng này BẮT BUỘC bắt đầu bằng dấu gạch ngang (-). KHÔNG dùng dấu ngoặc vuông. KHÔNG bỏ dấu gạch ngang đầu dòng.
 
 Chú ý:
 - Giữ nguyên các thông tin metadata được cung cấp (Source, URL, Title).

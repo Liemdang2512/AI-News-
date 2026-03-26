@@ -22,10 +22,18 @@ app = FastAPI(
 )
 
 # CORS Configuration
+# - In production, keep a strict allow-list.
+# - In local dev, allow localhost/127.0.0.1 on any port so Next.js can run on 3000/3002/etc.
+frontend_urls = getattr(settings, "FRONTEND_URLS", [settings.FRONTEND_URL])
+is_local_dev = any(
+    u.startswith("http://localhost") or u.startswith("http://127.0.0.1")
+    for u in frontend_urls
+)
+
 app.add_middleware(
     CORSMiddleware,
-    # When using cookies/credentials, CORS must not use wildcard origins.
-    allow_origins=[settings.FRONTEND_URL],
+    allow_origins=[] if is_local_dev else frontend_urls,
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$" if is_local_dev else None,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

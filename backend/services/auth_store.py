@@ -51,7 +51,15 @@ def _now_utc() -> datetime:
 
 
 def _storage_mode() -> str:
-    return (getattr(settings, "AUTH_SESSION_STORAGE", "memory") or "memory").lower()
+    mode = (getattr(settings, "AUTH_SESSION_STORAGE", "memory") or "memory").lower()
+    # If DSN is configured, prefer postgres persistence unless user explicitly forces memory.
+    auth_dsn = getattr(settings, "AUTH_DB_DSN", "")
+    log_dsn = getattr(settings, "LOG_DB_DSN", "")
+    if mode != "memory":
+        return mode
+    if (auth_dsn or log_dsn):
+        return "postgres"
+    return "memory"
 
 
 # Ensure auth store is initialized even when FastAPI lifespan/startup events

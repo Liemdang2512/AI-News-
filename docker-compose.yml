@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: app-crwal-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: app_crwal
+      POSTGRES_USER: app_crwal
+      POSTGRES_PASSWORD: app_crwal
+    ports:
+      - "5432:5432"
+    volumes:
+      - app_crwal_pgdata:/var/lib/postgresql/data
+      - ./backend/db/init.sql:/docker-entrypoint-initdb.d/00-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app_crwal -d app_crwal"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  app_crwal_pgdata:

@@ -1,18 +1,22 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Newspaper, Sparkles, Key, CheckCircle, Search, FileText, Zap } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Newspaper, Sparkles, CheckCircle, Search, FileText, Zap, LogOut } from 'lucide-react';
 import InputForm from '@/components/InputForm';
 import ArticleList from '@/components/ArticleList';
 import SummaryReport from '@/components/SummaryReport';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import CategoryStats from '@/components/CategoryStats';
 import ProgressTracker from '@/components/ProgressTracker';
+import AdminCreateUserPanel from '@/components/AdminCreateUserPanel';
 import { api, API_BASE_URL } from '@/lib/api';
 import { Article } from '@/lib/types';
 import SummarizationProgress from '@/components/SummarizationProgress';
+import { getMe, logout, type UserPublic } from '@/lib/auth';
 
 export default function Home() {
+    const router = useRouter();
     const [loading, setLoading] = useState(false);
     const [articles, setArticles] = useState<Article[]>([]);
     const [summary, setSummary] = useState('');
@@ -34,11 +38,8 @@ export default function Home() {
         { id: 'verification', label: 'Xác thực Báo Nhân Dân', status: 'pending' as const, message: '' },
     ]);
 
-    // API Key Settings
-    const [apiKey, setApiKey] = useState('');
-    const [tempApiKey, setTempApiKey] = useState('');
-    const [apiKeySaved, setApiKeySaved] = useState(false);
-    const [showApiConfig, setShowApiConfig] = useState(true); // Show by default, hide after save
+    const [user, setUser] = useState<UserPublic | null>(null);
+    const [authChecked, setAuthChecked] = useState(false);
 
     // Progress for summarization
     const [progressData, setProgressData] = useState({
@@ -49,56 +50,34 @@ export default function Home() {
     });
 
     useEffect(() => {
-        const storedKey = localStorage.getItem('gemini_api_key');
-        if (storedKey) {
-            setApiKey(storedKey);
-            setTempApiKey(storedKey);
-            setApiKeySaved(true);
-            setShowApiConfig(false); // Auto-collapse if key exists
-        }
-    }, []);
-
-    const handleSaveApiKey = () => {
-        console.log('=== SAVE API KEY CLICKED ===');
-        console.log('Current tempApiKey:', tempApiKey ? '***' + tempApiKey.slice(-4) : 'EMPTY');
-        console.log('Current apiKey:', apiKey ? '***' + apiKey.slice(-4) : 'EMPTY');
-
-        if (!tempApiKey || tempApiKey.trim() === '') {
-            console.error('API Key is empty!');
-            alert('Vui lòng nhập API Key');
-            return;
-        }
-
-        try {
-            const trimmedKey = tempApiKey.trim();
-            console.log('Trimmed key:', '***' + trimmedKey.slice(-4));
-
-            // Save to localStorage
-            localStorage.setItem('gemini_api_key', trimmedKey);
-            console.log('Saved to localStorage');
-
-            // Verify it was saved
-            const savedKey = localStorage.getItem('gemini_api_key');
-            console.log('Verification - Read from localStorage:', savedKey ? '***' + savedKey.slice(-4) : 'NOT FOUND');
-
-            if (savedKey !== trimmedKey) {
-                throw new Error('localStorage verification failed!');
+        let cancelled = false;
+        (async () => {
+            try {
+                const me = await getMe();
+                if (!cancelled) setUser(me);
+            } catch {
+                // Retry once to avoid redirect loop when cookie just got set.
+                await new Promise((resolve) => setTimeout(resolve, 150));
+                try {
+                    const meRetry = await getMe();
+                    if (!cancelled) setUser(meRetry);
+                } catch {
+                    if (!cancelled) router.replace('/login');
+                }
+            } finally {
+                if (!cancelled) setAuthChecked(true);
             }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [router]);
 
-            // Update state
-            setApiKey(trimmedKey);
-            setApiKeySaved(true);
-            console.log('State updated successfully');
-            console.log('=== SAVE COMPLETE ===');
-
-            // Collapse the API config section after save
-            setTimeout(() => {
-                setShowApiConfig(false);
-                setApiKeySaved(false);
-            }, 1500);
-        } catch (error) {
-            console.error('Failed to save API key:', error);
-            alert('Không thể lưu API Key. Vui lòng thử lại.\nLỗi: ' + error);
+    const handleLogout = async () => {
+        try {
+            await logout();
+        } finally {
+            router.replace('/login');
         }
     };
 
@@ -134,8 +113,8 @@ export default function Home() {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    ...(apiKey ? { 'X-Gemini-API-Key': apiKey } : {})
                 },
+                credentials: 'include',
                 body: JSON.stringify({
                     rss_urls: matchResponse.rss_feeds,
                     date: data.date,
@@ -268,9 +247,9 @@ export default function Home() {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-Gemini-API-Key': apiKey || '',
                     'Accept': 'application/x-ndjson'
                 },
+                credentials: 'include',
                 body: JSON.stringify({
                     urls,
                     articles: selectedArticles
@@ -355,113 +334,49 @@ export default function Home() {
         );
     }
 
+    if (!authChecked) {
+        return (
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+                <div className="text-slate-500 text-sm">Đang kiểm tra đăng nhập...</div>
+            </div>
+        );
+    }
+
     return (
         <div className="min-h-screen bg-slate-50 flex flex-col">
             {/* Header */}
             <header className="bg-navy-darkest text-white shadow-md sticky top-0 z-50">
-                <div className="max-w-7xl mx-auto px-6 lg:px-12 py-4 flex items-center justify-center">
+                <div className="max-w-7xl mx-auto px-6 lg:px-12 py-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <div className="w-8 h-8 bg-white rounded flex items-center justify-center">
                             <Newspaper className="w-5 h-5 text-navy-darkest" />
                         </div>
                         <h1 className="text-white text-lg font-bold">AI News Assistant</h1>
                     </div>
+
+                    {user ? (
+                        <div className="flex items-center gap-3">
+                            <div className="text-sm text-white/80">
+                                {user.email}
+                                <span className="ml-2 text-xs px-2 py-0.5 rounded bg-white/15">
+                                    {user.is_admin ? 'admin' : 'user'}
+                                </span>
+                            </div>
+                            <button
+                                onClick={handleLogout}
+                                className="px-3 py-2 text-sm bg-white/10 hover:bg-white/20 rounded-lg transition-colors font-medium flex items-center gap-2"
+                            >
+                                <LogOut className="w-4 h-4" />
+                                Đăng xuất
+                            </button>
+                        </div>
+                    ) : null}
                 </div>
             </header>
 
             {/* Main Content */}
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6 w-full flex-1">
-                {/* API Configuration Section - Collapsible */}
-                <div className="bg-white rounded-xl shadow-sm border border-blue-200 p-6">
-                    {!showApiConfig && apiKey ? (
-                        // Collapsed view - Show compact banner
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                                    <CheckCircle className="w-5 h-5 text-green-600" />
-                                </div>
-                                <div>
-                                    <h3 className="text-sm font-semibold text-slate-800">Đã cấu hình API Key</h3>
-                                    <p className="text-xs text-slate-500">Key: •••{apiKey.slice(-4)}</p>
-                                </div>
-                            </div>
-                            <button
-                                onClick={() => setShowApiConfig(true)}
-                                className="px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors font-medium"
-                            >
-                                Chỉnh sửa
-                            </button>
-                        </div>
-                    ) : (
-                        // Expanded view - Full configuration
-                        <>
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                                    <Key className="w-5 h-5 text-blue-600" />
-                                </div>
-                                <div>
-                                    <h2 className="text-lg font-bold text-slate-800">Cấu hình API</h2>
-                                    <p className="text-sm text-slate-500">
-                                        Nhập API key của bạn để kích hoạt tính năng tổng hợp tin tức và tóm tắt bằng AI.
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="space-y-3">
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-2">
-                                        API KEY
-                                    </label>
-                                    <div className="flex gap-3">
-                                        <div className="flex-1 relative">
-                                            <div className="absolute left-3 top-1/2 -translate-y-1/2">
-                                                <Key className="w-4 h-4 text-slate-400" />
-                                            </div>
-                                            <input
-                                                type="password"
-                                                value={tempApiKey}
-                                                onChange={(e) => setTempApiKey(e.target.value)}
-                                                placeholder="sk-••••••••••••••••••••"
-                                                className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                                            />
-                                        </div>
-                                        <button
-                                            onClick={handleSaveApiKey}
-                                            className={`px-6 py-2.5 rounded-lg transition-all font-medium flex items-center gap-2 ${apiKeySaved
-                                                ? 'bg-green-600 text-white'
-                                                : 'bg-blue-600 text-white hover:bg-blue-700'
-                                                }`}
-                                        >
-                                            {apiKeySaved ? (
-                                                <>
-                                                    <CheckCircle className="w-4 h-4" />
-                                                    Saved!
-                                                </>
-                                            ) : (
-                                                'Lưu Key'
-                                            )}
-                                        </button>
-                                    </div>
-                                </div>
-                                {apiKey && (
-                                    <div className="flex items-center gap-2 text-sm text-green-600">
-                                        <CheckCircle className="w-4 h-4" />
-                                        <span>API Key đã lưu: •••{apiKey.slice(-4)}</span>
-                                    </div>
-                                )}
-                                <a
-                                    href="https://aistudio.google.com/app/apikey"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 font-medium"
-                                >
-                                    <span className="w-4 h-4 bg-blue-100 rounded-full flex items-center justify-center text-xs">?</span>
-                                    Hướng dẫn lấy API Key?
-                                </a>
-                            </div>
-                        </>
-                    )}
-                </div>
+                {user?.is_admin ? <AdminCreateUserPanel /> : null}
 
                 {/* Progress Stepper */}
                 {currentProgressStep > 0 && (

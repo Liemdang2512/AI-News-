@@ -16,14 +16,20 @@ class Settings:
 
     # AI provider đang dùng: "gemini" hoặc "openai"
     AI_PROVIDER: str = os.getenv("AI_PROVIDER", "openai")
+    # Frontend origins allowed for CORS. Supports comma-separated list.
+    # Examples:
+    #   FRONTEND_URL=http://localhost:3000
+    #   FRONTEND_URL=http://localhost:3000,http://localhost:3002
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    FRONTEND_URLS: list[str] = [u.strip() for u in FRONTEND_URL.split(",") if u.strip()]
     # Backend server configuration
     # Default host is 0.0.0.0 to preserve existing behaviour where the service
     # is reachable from other network interfaces (e.g. Docker, LAN).
     # Desktop/Electron builds can override this via BACKEND_HOST=127.0.0.1
     # if they only need local access.
     BACKEND_HOST: str = os.getenv("BACKEND_HOST", "0.0.0.0")
-    BACKEND_PORT: int = int(os.getenv("BACKEND_PORT", "8000"))
+    # Railway sets PORT; BACKEND_PORT takes precedence for local/Docker use.
+    BACKEND_PORT: int = int(os.getenv("BACKEND_PORT") or os.getenv("PORT", "8000"))
 
     # Structured logging settings
     # - LOG_LEVEL: logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL); default INFO
@@ -55,6 +61,7 @@ class Settings:
     # Choose storage backend for session/user auth.
     # - "memory": in-process store (good for tests/dev)
     # - "postgres": asyncpg store (requires LOG_DB_DSN or AUTH_DB_DSN reuse)
+    AUTH_DB_DSN: str = os.getenv("AUTH_DB_DSN", "")
     AUTH_SESSION_STORAGE: str = os.getenv("AUTH_SESSION_STORAGE", "memory").lower()
 
     AUTH_SESSION_TTL_SEC: int = int(os.getenv("AUTH_SESSION_TTL_SEC", str(60 * 60 * 24 * 7)))  # 7 days

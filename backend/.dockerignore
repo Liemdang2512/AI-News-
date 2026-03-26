@@ -1,0 +1,11 @@
+.env
+/.env
+.venv
+**/__pycache__
+*.log
+backend.log
+frontend.log
+frontend-prod.log
+**/.pytest_cache
+**/.DS_Store
+

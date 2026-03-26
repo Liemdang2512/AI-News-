@@ -28,6 +28,25 @@ class RSSFetcher:
         "vov.vn": "VOV",
         "baotintuc.vn": "BÁO TIN TỨC",
     }
+
+    @staticmethod
+    def _clean_description(raw_description: str) -> str:
+        """
+        Chuẩn hóa mô tả lấy từ RSS:
+        - Bỏ HTML tags
+        - Chuẩn hóa whitespace
+        - Tránh trường hợp dấu ba chấm bị lặp (....)
+        """
+        if not raw_description:
+            return ""
+
+        text = re.sub(r"<[^>]+>", " ", raw_description)
+        text = re.sub(r"\s+", " ", text).strip()
+
+        # Chuẩn hóa phần kết thúc nếu RSS đã cắt ngắn
+        text = re.sub(r"\.{4,}$", "…", text)
+        text = re.sub(r"…{2,}$", "…", text)
+        return text
     
     async def fetch_and_filter(
         self,
@@ -208,12 +227,13 @@ class RSSFetcher:
             thumbnail = self._extract_thumbnail(entry)
             
             # Extract article data
+            raw_description = entry.get("description", "") or entry.get("summary", "")
             return {
                 "url": entry.get("link", ""),
                 "title": entry.get("title", ""),
                 "category": category,
                 "published_at": pub_date.strftime("%H:%M %d/%m/%Y"),
-                "description": entry.get("description", ""),
+                "description": self._clean_description(raw_description),
                 "source": source,
                 "thumbnail": thumbnail,
             }
