@@ -9,6 +9,23 @@ from services.secure_fetcher import secure_fetcher
 
 VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
 
+def _normalize_gmt_offset(pub_str: str) -> str:
+    """
+    Fix dateutil misparse of 'GMT+N' timezone strings.
+
+    dateutil follows POSIX convention where GMT+7 means UTC-7 (west of UTC).
+    But RSS feeds (RFC 2822) intend GMT+7 to mean UTC+7 (east of UTC, i.e. Vietnam).
+
+    This function replaces 'GMT+7' -> '+0700' and 'GMT-5' -> '-0500' so that
+    dateutil parses them with the correct sign.
+    """
+    def fix_gmt(m: re.Match) -> str:
+        sign = m.group(1)
+        hours = int(m.group(2))
+        return f"{sign}{hours:02d}00"
+
+    return re.sub(r"GMT([+-])(\d+)", fix_gmt, pub_str)
+
 class RSSFetcher:
     """
     Fetches RSS feeds and filters articles by date and time range
@@ -199,6 +216,12 @@ class RSSFetcher:
             if not pub_date_str:
                 return None
             
+            # Normalize 'GMT+N' timezone strings before parsing.
+            # dateutil interprets GMT+7 as UTC-7 (POSIX convention), but RSS feeds
+            # (RFC 2822) mean UTC+7. _normalize_gmt_offset flips the sign so dateutil
+            # produces the correct offset.
+            pub_date_str = _normalize_gmt_offset(pub_date_str)
+
             # Parse the date string (handles various formats)
             pub_date = date_parser.parse(pub_date_str)
 
