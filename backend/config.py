@@ -44,6 +44,23 @@ class Settings:
     )
     LOG_DB_DSN: str = os.getenv("LOG_DB_DSN", "")
     LOG_DB_REQUEST_TIMEOUT_SEC: float = float(os.getenv("LOG_DB_REQUEST_TIMEOUT_SEC", "10"))
+
+    # -----------------------------------------------------------------------
+    # Auth (cookie session)
+    # -----------------------------------------------------------------------
+    ADMIN_EMAIL: str = os.getenv("ADMIN_EMAIL", "")
+    # Expected to already be a hashed password (seeded from CI/.env).
+    ADMIN_PASSWORD_HASH: str = os.getenv("ADMIN_PASSWORD_HASH", "")
+
+    # Choose storage backend for session/user auth.
+    # - "memory": in-process store (good for tests/dev)
+    # - "postgres": asyncpg store (requires LOG_DB_DSN or AUTH_DB_DSN reuse)
+    AUTH_SESSION_STORAGE: str = os.getenv("AUTH_SESSION_STORAGE", "memory").lower()
+
+    AUTH_SESSION_TTL_SEC: int = int(os.getenv("AUTH_SESSION_TTL_SEC", str(60 * 60 * 24 * 7)))  # 7 days
+    AUTH_COOKIE_SECURE: bool = os.getenv("AUTH_COOKIE_SECURE", "false").lower() in ("1", "true", "yes", "on")
+    AUTH_COOKIE_SAMESITE: str = os.getenv("AUTH_COOKIE_SAMESITE", "lax").lower()
+    AUTH_SESSION_COOKIE_NAME: str = os.getenv("AUTH_SESSION_COOKIE_NAME", "session_id")
     
     # RSS Feed Database (from JSON workflow)
     RSS_DATABASE = [

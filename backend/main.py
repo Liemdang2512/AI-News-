@@ -12,6 +12,7 @@ from config import settings
 from services.request_db_logger import init_db_pool, log_request_to_db, new_request_id
 from services.request_context import set_request_id, get_request_id
 from services.app_logger import logger
+from services.auth_store import ensure_tables as ensure_auth_tables, seed_admin_if_missing
 
 app = FastAPI(
     title="News Aggregator API",
@@ -22,7 +23,8 @@ app = FastAPI(
 # CORS Configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for Vercel deployment debugging
+    # When using cookies/credentials, CORS must not use wildcard origins.
+    allow_origins=[settings.FRONTEND_URL],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -36,6 +38,15 @@ app.include_router(news_router)
 async def _init_logging_db() -> None:
     # Initialize DB logging pool + ensure tables (no-op when disabled).
     await init_db_pool()
+
+    # Initialize auth session store schema + seed admin (if env provided).
+    # Must be safe even when auth env vars are missing.
+    await ensure_auth_tables()
+    try:
+        await seed_admin_if_missing(settings.ADMIN_EMAIL, settings.ADMIN_PASSWORD_HASH)
+    except Exception:
+        # Do not crash the API startup if auth seeding fails.
+        pass
 
 
 @app.middleware("http")
