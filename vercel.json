@@ -1,4 +1,10 @@
 {
     "buildCommand": "cd frontend && npm run build",
-    "outputDirectory": "frontend/.next"
+    "outputDirectory": "frontend/.next",
+    "rewrites": [
+        {
+            "source": "/api/:path*",
+            "destination": "https://ai-news-production-7cfe.up.railway.app/api/:path*"
+        }
+    ]
 }
