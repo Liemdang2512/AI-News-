@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: login-auth
 status: Ready to plan
-last_updated: "2026-03-26T06:05:46Z"
+last_updated: "2026-03-26T06:12:49Z"
 progress:
   total_phases: 3
   completed_phases: 0
@@ -29,9 +29,14 @@ Phase 3: Cookie session Auth + User store
 
 Phase: 03 (cookie session auth) — READY TO PLAN
 Plan: —
-Last activity: 2026-03-26T06:05:46Z — Start milestone v1.1 Login/Auth, ready to discuss Phase 3.
+Last activity: 2026-03-26T06:12:49Z — Phase 3 context gathered (ready to plan).
 
 ## Recent Decisions
 - Cookie session server-side (session_id trong HttpOnly cookie)
 - Admin-create user flow (admin tạo user email/password; tắt public register)
 - Chặn UI + streaming endpoints khi chưa đăng nhập (UI gating + protected SSE/NDJSON)
+
+## Session Continuity
+Last session: 2026-03-26T06:12:49Z
+Stopped at: Phase 3 context gathered
+Resume file: .planning/phases/03-login-auth-cookie-session/03-CONTEXT.md
