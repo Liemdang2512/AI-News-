@@ -26,3 +26,18 @@ Plans:
 - [x] 01-01-PLAN.md — Trafilatura layer 0 trong _extract_content() + requirements.txt (Wave 1)
 - [x] 01-02-PLAN.md — Playwright wait_for_selector timeout 5000ms → 2000ms (Wave 1, parallel) ✓ 2026-03-25
 - [x] 01-03-PLAN.md — Bullet validation regex + BATCH_SIZE 10 + prompt hardening (Wave 2)
+
+## Milestone 2: Logging & Observability
+
+### Phase 2: Logging request/response, AI calls, và streaming
+**Goal:** Ghi log request/response và lỗi ở backend FastAPI, có correlation `X-Request-ID`, log riêng cho các lần gọi AI (OpenAI/Gemini) nhưng redacts API keys, log tiến trình cho SSE/NDJSON streaming, cấu hình qua env và cập nhật docs ngắn.
+
+**Requirements:** LOG-001, LOG-002, LOG-003, LOG-004, LOG-005, LOG-006, LOG-007
+
+**Plans:** 1/4 plans executed
+
+Plans:
+- [x] 02-00-PLAN.md — Logging test scaffold (Wave 0) (RED)
+- [ ] 02-01-PLAN.md — Logger foundation + middleware request-id logging (Wave 1)
+- [ ] 02-02-PLAN.md — AI call logging (OpenAI/Gemini) + redaction (Wave 2)
+- [ ] 02-03-PLAN.md — Streaming progress logging + frontend basic log + docs (Wave 2)

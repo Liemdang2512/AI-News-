@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Milestone complete
-last_updated: "2026-03-25T02:51:40.711Z"
+status: Ready to execute
+last_updated: "2026-03-26T04:08:59.671Z"
 progress:
-  total_phases: 1
+  total_phases: 2
   completed_phases: 1
-  total_plans: 4
-  completed_plans: 4
+  total_plans: 8
+  completed_plans: 5
 ---
 
 # Project State
@@ -32,6 +32,7 @@ Milestone 1: Quy trình đọc và tóm tắt bài viết ổn định
 - Output luôn có bullet "- " để đảm bảo consistency
 - [Phase 01-quy-trinh-doc-va-tom-tat]: Add trafilatura as layer 0 in _extract_content() with try/except ImportError guard for graceful degradation
 - [Phase 01-quy-trinh-doc-va-tom-tat]: Use regex r'^- .{20,}' with MULTILINE flag in _has_bullet_content to detect real bullet lines, avoiding false-positives from URL paths with dashes
+- [Phase 02-00]: Test scaffold runs with 3/4 tests GREEN at Wave 0 because X-Request-ID middleware was already in main.py; only redact_secrets test stays RED
 
 ## Active Phase
 
@@ -39,10 +40,13 @@ Phase 1: Quy trình đọc và tóm tắt bài viết
 
 ## Current Position
 
+Phase: 02 (logging-request-response) — EXECUTING
+Plan: 2 of 4
+
 - **Phase:** 01
 - **Completed Plan:** 01-03 (Bullet Validation + BATCH_SIZE + Prompt Hardening)
 - **Next Plan:** Phase Complete — all 4 plans done
-- **Last session:** 2026-03-25T02:47:04.111Z
+- **Last session:** 2026-03-26T04:08:59.667Z
 
 ## Recent Decisions
 
