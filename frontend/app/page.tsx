@@ -62,7 +62,7 @@ export default function Home() {
                     const meRetry = await getMe();
                     if (!cancelled) setUser(meRetry);
                 } catch {
-                    if (!cancelled) router.replace('/login');
+                    if (!cancelled) router.replace('/loginn');
                 }
             } finally {
                 if (!cancelled) setAuthChecked(true);
@@ -77,7 +77,7 @@ export default function Home() {
         try {
             await logout();
         } finally {
-            router.replace('/login');
+            router.replace('/loginn');
         }
     };
 
