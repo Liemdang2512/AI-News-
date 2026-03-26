@@ -1,17 +1,26 @@
 /** @type {import('next').NextConfig} */
 const isElectron = process.env.NEXT_OUTPUT === 'export'
+const BACKEND_URL = process.env.BACKEND_URL || 'https://ai-news-production-7cfe.up.railway.app'
 
 const nextConfig = {
     reactStrictMode: true,
-    // Static export only for Electron desktop build (set NEXT_OUTPUT=export)
-    // Vercel deployment uses Next.js server mode for rewrites/proxy support
     ...(isElectron
         ? {
             output: 'export',
             assetPrefix: './',
             trailingSlash: true,
         }
-        : {}),
+        : {
+            // Proxy /api/* to Railway backend (avoids cross-domain cookie issues)
+            async rewrites() {
+                return [
+                    {
+                        source: '/api/:path*',
+                        destination: `${BACKEND_URL}/api/:path*`,
+                    },
+                ]
+            },
+        }),
 }
 
 module.exports = nextConfig
