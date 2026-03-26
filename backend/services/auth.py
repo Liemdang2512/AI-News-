@@ -7,8 +7,10 @@ from fastapi import HTTPException, Request
 
 from config import settings
 from services.auth_password import verify_password
-from services.auth_store import create_session, get_user_by_email, revoke_session
+from services.auth_store import create_session, get_user_by_email, get_user_by_session_id, revoke_session
 from services.auth_types import UserPublic
+from services.app_logger import logger
+from services.request_context import get_request_id
 
 # Cookie/session contract constants
 SESSION_COOKIE_NAME: str = getattr(settings, "AUTH_SESSION_COOKIE_NAME", "session_id")
@@ -91,7 +93,22 @@ async def get_current_user(request: Request) -> UserPublic | None:
 
     Wave 2 Task 00 will replace this with real cookie->session validation.
     """
+    try:
+        session_id = request.cookies.get(SESSION_COOKIE_NAME)
+        if not session_id:
+            return None
 
-    _ = (request, HTTPException)  # keep lint happy for unused imports in stub
-    return None
+        user = await get_user_by_session_id(session_id)
+        if user is not None:
+            # Attach for downstream usage/logging.
+            request.state.user = user
+        return user
+    except Exception:
+        # Generic error: never leak session_id/password_hash.
+        logger.error(
+            "auth.get_current_user.error",
+            extra={"request_id": get_request_id()},
+            exc_info=True,
+        )
+        return None
 
