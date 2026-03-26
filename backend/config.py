@@ -6,11 +6,16 @@ load_dotenv()
 
 class Settings:
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
-    # Tên model REST v1 (generativelanguage.googleapis.com/v1/models/{model}:generateContent)
-    # gemini-3.0-flash-preview không tồn tại trên API công khai → mọi bài tóm tắt thất bại.
-    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-3.0-flash-preview")
+    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-3-flash-preview")
     # Timeout HTTP cho generateContent (giây) — bài dài / mạng chậm
     GEMINI_REQUEST_TIMEOUT: float = float(os.getenv("GEMINI_REQUEST_TIMEOUT", "120"))
+
+    # OpenAI / GPT
+    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+    OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+
+    # AI provider đang dùng: "gemini" hoặc "openai"
+    AI_PROVIDER: str = os.getenv("AI_PROVIDER", "openai")
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
     # Backend server configuration
     # Default host is 0.0.0.0 to preserve existing behaviour where the service
@@ -19,6 +24,26 @@ class Settings:
     # if they only need local access.
     BACKEND_HOST: str = os.getenv("BACKEND_HOST", "0.0.0.0")
     BACKEND_PORT: int = int(os.getenv("BACKEND_PORT", "8000"))
+
+    # Structured logging settings
+    # - LOG_LEVEL: logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL); default INFO
+    # - LOG_JSON: if "true" (case-insensitive), emit logs as JSON lines; default false (plain text)
+    # - LOG_FILE: if non-empty, also write logs to this file path (append mode); default "" (stdout only)
+    LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
+    LOG_JSON: bool = os.getenv("LOG_JSON", "false").lower() in ("1", "true", "yes", "on")
+    LOG_FILE: str = os.getenv("LOG_FILE", "")
+
+    # DB logging (Postgres on Railway)
+    # - LOG_DB_ENABLED=false: keep current behaviour (no DB)
+    # - LOG_DB_DSN: set to Railway Postgres DSN (e.g. postgresql://user:pass@host:5432/dbname?sslmode=require)
+    LOG_DB_ENABLED: bool = os.getenv("LOG_DB_ENABLED", "false").lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+    LOG_DB_DSN: str = os.getenv("LOG_DB_DSN", "")
+    LOG_DB_REQUEST_TIMEOUT_SEC: float = float(os.getenv("LOG_DB_REQUEST_TIMEOUT_SEC", "10"))
     
     # RSS Feed Database (from JSON workflow)
     RSS_DATABASE = [
