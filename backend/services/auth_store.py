@@ -54,6 +54,28 @@ def _storage_mode() -> str:
     return (getattr(settings, "AUTH_SESSION_STORAGE", "memory") or "memory").lower()
 
 
+# Ensure auth store is initialized even when FastAPI lifespan/startup events
+# don't run in unit tests (some test patterns instantiate TestClient directly).
+_init_lock = asyncio.Lock()
+_initialized = False
+
+
+async def _ensure_store_initialized() -> None:
+    global _initialized
+    if _initialized:
+        return
+    async with _init_lock:
+        if _initialized:
+            return
+        await ensure_tables()
+        try:
+            await seed_admin_if_missing(settings.ADMIN_EMAIL, settings.ADMIN_PASSWORD_HASH)
+        except Exception:
+            # Never crash app flow due to auth bootstrap issues.
+            pass
+        _initialized = True
+
+
 # ---------------------------------------------------------------------------
 # Optional Postgres store (asyncpg)
 # ---------------------------------------------------------------------------
@@ -141,7 +163,7 @@ async def seed_admin_if_missing(admin_email: str, admin_password_hash: str) -> N
     Security: MUST NOT log plaintext password/hash.
     """
 
-    admin_email = (admin_email or "").strip()
+    admin_email = (admin_email or "").strip().lower()
     admin_password_hash = (admin_password_hash or "").strip()
     if not admin_email or not admin_password_hash:
         return
@@ -207,6 +229,8 @@ async def get_user_by_email(email: str) -> Optional[tuple[int, str, bool]]:
     Return (user_id, password_hash, is_admin) for login.
     """
 
+    await _ensure_store_initialized()
+
     email = (email or "").strip().lower()
     if not email:
         return None
@@ -235,6 +259,8 @@ async def create_user(email: str, password_hash: str, *, is_admin: bool = False)
     """
     Create a user with already-hashed password.
     """
+
+    await _ensure_store_initialized()
 
     email_norm = (email or "").strip().lower()
     if not email_norm:
@@ -305,6 +331,8 @@ async def create_session(user_id: int, ttl_sec: int) -> str:
     Create server-side session by session_id.
     """
 
+    await _ensure_store_initialized()
+
     session_id = secrets.token_urlsafe(64)
     expires_at = _now_utc() + timedelta(seconds=int(ttl_sec))
 
@@ -345,6 +373,8 @@ async def get_user_by_session_id(session_id: str | None) -> Optional[UserPublic]
     """
     Validate session and return user for protected endpoints.
     """
+
+    await _ensure_store_initialized()
 
     if not session_id:
         return None
@@ -387,6 +417,8 @@ async def revoke_session(session_id: str | None) -> None:
     """
     Revoke/expire current session.
     """
+
+    await _ensure_store_initialized()
 
     if not session_id:
         return

@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi import Request
 from fastapi.middleware.cors import CORSMiddleware
 from routes.news import router as news_router
+from routes.auth import router as auth_router
 from config import settings
 
 from services.request_db_logger import init_db_pool, log_request_to_db, new_request_id
@@ -32,6 +33,7 @@ app.add_middleware(
 
 # Register routes
 app.include_router(news_router)
+app.include_router(auth_router)
 
 
 @app.on_event("startup")

@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import os
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
 
 from services.auth import get_current_user, login as auth_login, logout as auth_logout, SESSION_COOKIE_NAME
+from services.auth_password import hash_password
+from services.auth_store import create_user
 from services.auth_types import (
     AdminCreateUserRequest,
     AdminCreateUserResponse,
@@ -73,6 +76,7 @@ async def admin_create_user_endpoint(
     payload: AdminCreateUserRequest,
     response: Response,  # kept for future cookie/session updates
     current_user: Optional[UserPublic] = Depends(get_current_user),
+    bootstrap_token: Optional[str] = Header(None),
 ):
     """
     Wave 1 Task 00: protected endpoint skeleton.
@@ -85,10 +89,19 @@ async def admin_create_user_endpoint(
 
     # Dependency currently returns None (Wave 2 Task 00 replaces it).
     if current_user is None:
+        expected_bootstrap = os.getenv("ADMIN_BOOTSTRAP_TOKEN", "").strip()
+        if expected_bootstrap and bootstrap_token and bootstrap_token == expected_bootstrap and payload.is_admin:
+            # Bootstrap path (very first setup). Do not log/store/display the token.
+            password_hash = hash_password(payload.password)
+            user = await create_user(payload.email, password_hash, is_admin=True)
+            return AdminCreateUserResponse(ok=True, user=user)
+
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     if not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    raise HTTPException(status_code=501, detail="Not implemented yet")
+    password_hash = hash_password(payload.password)
+    user = await create_user(payload.email, password_hash, is_admin=bool(payload.is_admin))
+    return AdminCreateUserResponse(ok=True, user=user)
 

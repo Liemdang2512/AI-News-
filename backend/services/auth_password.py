@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-from passlib.context import CryptContext
-
-_pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
+import bcrypt
 
 def hash_password(password: str) -> str:
     """
@@ -12,7 +9,10 @@ def hash_password(password: str) -> str:
     Security: this function MUST NOT log plaintext password.
     """
 
-    return _pwd_context.hash(password)
+    # bcrypt works on bytes; never log plaintext password.
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(password.encode("utf-8"), salt)
+    return hashed.decode("utf-8")
 
 
 def verify_password(password: str, password_hash: str) -> bool:
@@ -22,5 +22,11 @@ def verify_password(password: str, password_hash: str) -> bool:
     Security: this function MUST NOT log plaintext password or password_hash.
     """
 
-    return _pwd_context.verify(password, password_hash)
+    try:
+        return bcrypt.checkpw(
+            password.encode("utf-8"),
+            password_hash.encode("utf-8"),
+        )
+    except Exception:
+        return False
 
