@@ -51,6 +51,10 @@ class Settings:
     LOG_DB_DSN: str = os.getenv("LOG_DB_DSN", "")
     LOG_DB_REQUEST_TIMEOUT_SEC: float = float(os.getenv("LOG_DB_REQUEST_TIMEOUT_SEC", "10"))
 
+    # Crawl/summarizer concurrency tuning (important for server RAM)
+    SUMMARIZER_MAX_CONCURRENCY: int = int(os.getenv("SUMMARIZER_MAX_CONCURRENCY", "4"))
+    SUMMARIZER_BATCH_SIZE: int = int(os.getenv("SUMMARIZER_BATCH_SIZE", "4"))
+
     # -----------------------------------------------------------------------
     # Auth (cookie session)
     # -----------------------------------------------------------------------

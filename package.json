@@ -3,6 +3,6 @@
   "name": "ai-news-assistant",
   "scripts": {
     "dev:backend": "bash backend/dev.sh",
-    "dev:frontend": "cd frontend && NEXT_PUBLIC_API_URL=http://127.0.0.1:8000 npm run dev"
+    "dev:frontend": "cd frontend && NEXT_PUBLIC_API_URL=http://localhost:8000 npm run dev"
   }
 }

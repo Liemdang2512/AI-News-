@@ -14,7 +14,6 @@ from config import settings
 from services.secure_fetcher import secure_fetcher
 from services.rss_fetcher import rss_fetcher
 from services.gemini_client import gemini_client
-from services.playwright_fetcher import playwright_fetcher
 from prompts import SINGLE_ARTICLE_SUMMARIZE_PROMPT, SINGLE_ARTICLE_URL_SUMMARIZE_PROMPT
 
 class Summarizer:
@@ -24,8 +23,11 @@ class Summarizer:
     """
     
     def __init__(self):
-        # Semaphore to limit concurrent tasks (avoid rate limits)
-        self.semaphore = asyncio.Semaphore(10) # Process 10 articles at a time
+        # Limit concurrent article processing to keep server memory stable.
+        max_concurrency = max(1, int(getattr(settings, "SUMMARIZER_MAX_CONCURRENCY", 4)))
+        configured_batch_size = max(1, int(getattr(settings, "SUMMARIZER_BATCH_SIZE", 4)))
+        self.semaphore = asyncio.Semaphore(max_concurrency)
+        self.batch_size = min(max_concurrency, configured_batch_size)
 
     _MIN_CHARS_TO_SUMMARIZE = 80
     _HTTP_HEADERS = {
@@ -159,31 +161,11 @@ class Summarizer:
             return False
         return bool(re.search(r'^- .{20,}', summary, re.MULTILINE))
 
-    # Các domain dùng JS nặng — dùng Playwright trước để đọc được nội dung
-    _JS_HEAVY_DOMAINS = (
-        "laodong.vn", "dantri.com.vn", "vtv.vn", "tuoitre.vn",
-        "vnexpress.net", "thanhnien.vn", "tienphong.vn", "vietnamplus.vn",
-        "sggp.org.vn", "hanoimoi.vn", "nhandan.vn", "baotintuc.vn", "vov.vn",
-    )
-
-    def _is_js_heavy(self, url: str) -> bool:
-        return any(d in url for d in self._JS_HEAVY_DOMAINS)
-
     async def _fetch_article_html(self, url: str, timeout: int = 25) -> str:
         """
         Fetch nội dung HTML bài báo bằng nhiều cơ chế.
-        Site JS-heavy: Playwright trước. Site khác: curl_cffi → httpx → Playwright.
+        Dùng curl_cffi trước, sau đó fallback httpx.
         """
-        # Site dùng JS nặng: thử Playwright trước để đọc đúng nội dung
-        if self._is_js_heavy(url):
-            try:
-                html = await playwright_fetcher.fetch(url, timeout=timeout)
-                if html and len(html.strip()) > 500 and not self._looks_like_block_page(html):
-                    print(f"   🎭 Playwright (JS-heavy) thành công: {url[:60]}")
-                    return html
-            except Exception:
-                pass
-
         # 1) Secure fetcher / curl_cffi (tốt cho site anti-bot)
         try:
             html = await secure_fetcher.fetch_rss(url, timeout=timeout)
@@ -205,16 +187,6 @@ class Summarizer:
                     return html
         except Exception:
             pass
-
-        # 3) Playwright (site không phải JS-heavy, thử lần cuối)
-        if not self._is_js_heavy(url):
-            try:
-                html = await playwright_fetcher.fetch(url, timeout=timeout)
-                if html and len(html.strip()) > 200 and not self._looks_like_block_page(html):
-                    print(f"   🎭 Playwright thành công: {url[:60]}")
-                    return html
-            except Exception:
-                pass
 
         return ""
 
@@ -289,8 +261,8 @@ class Summarizer:
 
             tasks.append(self._process_single_article(url, metadata, api_key))
             
-        # Process in batches (BATCH_SIZE = 10) and yield progress
-        BATCH_SIZE = 10
+        # Process in controlled batches to avoid RAM spikes on server.
+        BATCH_SIZE = self.batch_size
         all_results = []
         
         for i in range(0, len(tasks), BATCH_SIZE):

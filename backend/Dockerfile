@@ -1,12 +1,12 @@
-# Sử dụng image chính thức của Playwright (đã bao gồm Python và Browsers)
-FROM mcr.microsoft.com/playwright/python:v1.40.0-jammy
+# Sử dụng Python slim để giảm dung lượng và RAM footprint
+FROM python:3.11-slim
 
 # Thiết lập thư mục làm việc
 WORKDIR /app
 
 # Copy requirements và cài đặt dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt && python -m playwright install chromium
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy toàn bộ code backend vào container
 COPY . .

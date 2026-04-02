@@ -7,7 +7,6 @@ httpx==0.26.0
 python-dateutil>=2.9.0.post0
 curl-cffi>=0.5.10
 bcrypt
-playwright>=1.44.0
 trafilatura>=2.0.0
 lxml>=4.9.0
 lxml_html_clean>=0.1.0
