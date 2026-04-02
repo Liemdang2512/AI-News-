@@ -6,10 +6,7 @@ WORKDIR /app
 
 # Copy requirements và cài đặt dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Cài đặt trình duyệt Chromium cho Playwright
-RUN playwright install chromium
+RUN pip install --no-cache-dir -r requirements.txt && python -m playwright install chromium
 
 # Copy toàn bộ code backend vào container
 COPY . .
