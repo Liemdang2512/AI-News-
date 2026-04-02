@@ -4,6 +4,18 @@ const BACKEND_URL = process.env.BACKEND_URL || 'https://ai-news-production-7cfe.
 
 const nextConfig = {
     reactStrictMode: true,
+
+    // Nén response HTTP (gzip/brotli) cho tất cả assets
+    compress: true,
+
+    // Tắt X-Powered-By header — nhỏ nhưng giảm overhead
+    poweredByHeader: false,
+
+    // Tối ưu package imports: tree-shake chỉ lấy icon được dùng
+    experimental: {
+        optimizePackageImports: ['lucide-react'],
+    },
+
     ...(isElectron
         ? {
             output: 'export',

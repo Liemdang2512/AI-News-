@@ -1,19 +1,22 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { Newspaper, Sparkles, CheckCircle, Search, FileText, Zap, LogOut } from 'lucide-react';
 import InputForm from '@/components/InputForm';
-import ArticleList from '@/components/ArticleList';
-import SummaryReport from '@/components/SummaryReport';
 import LoadingSpinner from '@/components/LoadingSpinner';
-import CategoryStats from '@/components/CategoryStats';
-import ProgressTracker from '@/components/ProgressTracker';
-import AdminCreateUserPanel from '@/components/AdminCreateUserPanel';
 import { api, API_BASE_URL } from '@/lib/api';
 import { Article } from '@/lib/types';
-import SummarizationProgress from '@/components/SummarizationProgress';
 import { getMe, logout, type UserPublic } from '@/lib/auth';
+
+// Lazy-load: chỉ render khi cần, không tải vào bundle ban đầu
+const ArticleList = dynamic(() => import('@/components/ArticleList'), { loading: () => <LoadingSpinner text="Đang tải danh sách..." /> });
+const SummaryReport = dynamic(() => import('@/components/SummaryReport'));
+const CategoryStats = dynamic(() => import('@/components/CategoryStats'));
+const ProgressTracker = dynamic(() => import('@/components/ProgressTracker'));
+const SummarizationProgress = dynamic(() => import('@/components/SummarizationProgress'));
+const AdminCreateUserPanel = dynamic(() => import('@/components/AdminCreateUserPanel'));
 
 export default function Home() {
     const router = useRouter();

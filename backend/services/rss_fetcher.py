@@ -1,3 +1,4 @@
+import asyncio
 import feedparser
 import httpx
 from typing import List, Dict, Optional
@@ -135,10 +136,10 @@ class RSSFetcher:
             except Exception as e:
                 print(f"❌ Secure Fetcher error: {str(e)}")
         
-        # Fetch normal URLs with httpx (faster)
+        # Fetch normal URLs with httpx — concurrent với asyncio.gather
         if normal_urls:
-            print(f"⚡ Using HTTP for {len(normal_urls)} URLs (no anti-bot)")
-            
+            print(f"⚡ Using HTTP for {len(normal_urls)} URLs (concurrent, no anti-bot)")
+
             # Headers to bypass basic anti-bot
             headers = {
                 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -148,34 +149,30 @@ class RSSFetcher:
                 'Connection': 'keep-alive',
                 'Upgrade-Insecure-Requests': '1',
             }
-            
+
+            async def _fetch_one(client: httpx.AsyncClient, rss_url: str) -> List[Dict]:
+                try:
+                    response = await client.get(rss_url)
+                    feed = feedparser.parse(response.text)
+                    print(f"   ✅ {rss_url}: {len(feed.entries)} entries")
+                    articles = []
+                    for entry in feed.entries:
+                        article = self._process_entry(entry, target_dt, start_time, end_time, rss_url)
+                        if article:
+                            articles.append(article)
+                    return articles
+                except Exception as e:
+                    print(f"   ❌ {rss_url}: {str(e)}")
+                    return []
+
             async with httpx.AsyncClient(
                 timeout=30.0,
                 follow_redirects=True,
                 headers=headers
             ) as client:
-                for rss_url in normal_urls:
-                    try:
-                        response = await client.get(rss_url)
-                        feed = feedparser.parse(response.text)
-                        
-                        print(f"   ✅ {rss_url}: {len(feed.entries)} entries")
-                        
-                        # Process each entry
-                        for entry in feed.entries:
-                            article = self._process_entry(
-                                entry,
-                                target_dt,
-                                start_time,
-                                end_time,
-                                rss_url
-                            )
-                            if article:
-                                all_articles.append(article)
-                                
-                    except Exception as e:
-                        print(f"   ❌ {rss_url}: {str(e)}")
-                        continue
+                results = await asyncio.gather(*[_fetch_one(client, url) for url in normal_urls])
+                for article_list in results:
+                    all_articles.extend(article_list)
         
         return all_articles
     
@@ -336,7 +333,6 @@ class RSSFetcher:
         # Try to extract image from description HTML
         description = entry.get('description', '') or entry.get('summary', '')
         if description:
-            import re
             # Look for img tags
             img_match = re.search(r'<img[^>]+src=["\']([^"\']+)["\']', description)
             if img_match:
