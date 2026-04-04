@@ -167,8 +167,7 @@ Nguồn: {source}
 """
 
 
-SINGLE_ARTICLE_SUMMARIZE_PROMPT = """# VAI TRÒ
-Hãy đóng vai phóng viên báo Nhân Dân. Dựa trên dữ liệu gốc được cung cấp, hãy viết một tin ngắn từ 130 đến 150 từ.
+SINGLE_ARTICLE_SUMMARIZE_PROMPT = """Hãy đóng vai phóng viên báo Nhân Dân. Dựa trên dữ liệu gốc được cung cấp, hãy viết một tin ngắn từ 130 đến 150 chữ.
 
 # DỮ LIỆU ĐẦU VÀO
 Tiêu đề gốc: {title}
@@ -187,11 +186,11 @@ Trả về CHÍNH XÁC theo cấu trúc sau — không thêm, không bớt, khô
 
 {title}
 
-Nguồn: {source}
+{source}
 
 {url}
 
-- Viết nội dung tin ngắn 130-150 từ ở đây. Dòng này BẮT BUỘC bắt đầu bằng dấu gạch ngang (-). KHÔNG dùng dấu ngoặc vuông. KHÔNG bỏ dấu gạch ngang đầu dòng.
+- Viết nội dung tin ngắn 130-150 chữ ở đây. Dòng này BẮT BUỘC bắt đầu bằng dấu gạch ngang (-). KHÔNG dùng dấu ngoặc vuông. KHÔNG bỏ dấu gạch ngang đầu dòng.
 
 Chú ý:
 - Giữ nguyên các thông tin metadata được cung cấp (Source, URL, Title).
