@@ -2,5 +2,11 @@
     "buildCommand": "next build",
     "devCommand": "next dev",
     "installCommand": "npm install",
-    "framework": "nextjs"
+    "framework": "nextjs",
+    "rewrites": [
+        {
+            "source": "/api/:path*",
+            "destination": "https://ai-news-rosy.vercel.app/api/:path*"
+        }
+    ]
 }

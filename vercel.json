@@ -1,10 +1,18 @@
 {
-    "buildCommand": "cd frontend && npm run build",
-    "outputDirectory": "frontend/.next",
-    "rewrites": [
+    "version": 2,
+    "builds": [
         {
-            "source": "/api/:path*",
-            "destination": "https://ai-news-rosy.vercel.app/api/:path*"
+            "src": "backend/index.py",
+            "use": "@vercel/python",
+            "config": {
+                "maxLambdaSize": "15mb"
+            }
+        }
+    ],
+    "routes": [
+        {
+            "src": "/(.*)",
+            "dest": "backend/index.py"
         }
     ]
 }
