@@ -47,13 +47,22 @@ app.include_router(auth_router)
 @app.on_event("startup")
 async def _init_logging_db() -> None:
     # Initialize DB logging pool + ensure tables (no-op when disabled).
-    await init_db_pool()
+    try:
+        await asyncio.wait_for(init_db_pool(), timeout=8)
+    except Exception:
+        pass
 
     # Initialize auth session store schema + seed admin (if env provided).
     # Must be safe even when auth env vars are missing.
-    await ensure_auth_tables()
     try:
-        await seed_admin_if_missing(settings.ADMIN_EMAIL, settings.ADMIN_PASSWORD_HASH)
+        await asyncio.wait_for(ensure_auth_tables(), timeout=8)
+    except Exception:
+        pass
+    try:
+        await asyncio.wait_for(
+            seed_admin_if_missing(settings.ADMIN_EMAIL, settings.ADMIN_PASSWORD_HASH),
+            timeout=8,
+        )
     except Exception:
         # Do not crash the API startup if auth seeding fails.
         pass

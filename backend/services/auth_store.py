@@ -106,11 +106,19 @@ async def _get_pool() -> Optional["asyncpg.Pool"]:
     async with _pool_lock:
         if _pool is not None:
             return _pool
+        import ssl as _ssl
+        ssl_ctx: object = False
+        if "sslmode=require" in dsn or "sslmode=prefer" in dsn:
+            ssl_ctx = _ssl.create_default_context()
+            ssl_ctx.check_hostname = False
+            ssl_ctx.verify_mode = _ssl.CERT_NONE
+            dsn = dsn.replace("?sslmode=require", "").replace("&sslmode=require", "").replace("?sslmode=prefer", "").replace("&sslmode=prefer", "")
         _pool = await asyncpg.create_pool(
             dsn=dsn,
             min_size=1,
             max_size=5,
             command_timeout=10,
+            ssl=ssl_ctx if ssl_ctx is not False else None,
         )
     return _pool
 

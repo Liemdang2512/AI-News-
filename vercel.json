@@ -4,7 +4,7 @@
     "rewrites": [
         {
             "source": "/api/:path*",
-            "destination": "https://ai-news-production-7cfe.up.railway.app/api/:path*"
+            "destination": "https://ai-news-rosy.vercel.app/api/:path*"
         }
     ]
 }
