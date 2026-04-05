@@ -70,7 +70,7 @@ class Settings:
 
     AUTH_SESSION_TTL_SEC: int = int(os.getenv("AUTH_SESSION_TTL_SEC", str(60 * 60 * 24 * 7)))  # 7 days
     AUTH_COOKIE_SECURE: bool = os.getenv("AUTH_COOKIE_SECURE", "false").lower() in ("1", "true", "yes", "on")
-    AUTH_COOKIE_SAMESITE: str = os.getenv("AUTH_COOKIE_SAMESITE", "lax").lower()
+    AUTH_COOKIE_SAMESITE: str = os.getenv("AUTH_COOKIE_SAMESITE", "lax").strip().lower()
     AUTH_SESSION_COOKIE_NAME: str = os.getenv("AUTH_SESSION_COOKIE_NAME", "session_id")
     
     # RSS Feed Database (from JSON workflow)

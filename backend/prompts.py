@@ -176,9 +176,15 @@ Link bài gốc: {url}
 Nội dung:
 {content}
 
+# RÀNG BUỘC TUYỆT ĐỐI VỀ NỘI DUNG
+- CHỈ được sử dụng thông tin có trong "Nội dung" và "Tiêu đề gốc" phía trên.
+- TUYỆT ĐỐI KHÔNG tự bịa đặt, suy diễn, hoặc thêm bất kỳ thông tin nào không có trong dữ liệu đầu vào (số liệu, tên người, địa điểm, sự kiện, ngày tháng, nguyên nhân, kết quả...).
+- Nếu dữ liệu đầu vào quá ngắn (chỉ có tiêu đề hoặc vài dòng), hãy diễn đạt lại ngắn gọn những gì đã có, KHÔNG được viết thêm chi tiết không có trong nguồn.
+- Không được bổ sung bối cảnh, giải thích nền, hoặc phân tích mà nguồn không đề cập.
+
 # YÊU CẦU VỀ NỘI DUNG VÀ VĂN PHONG
 Văn phong: Chuẩn mực, trang trọng, chính luận; lập luận chặt chẽ; lồng ghép khéo léo các thuật ngữ quản lý nhà nước hoặc phát triển bền vững.
-Cấu trúc: Nội dung đầy đủ các thông tin cốt lõi (Ai, cái gì, ở đâu, khi nào, tại sao).
+Cấu trúc: Chỉ nêu các thông tin cốt lõi có trong nguồn (Ai, cái gì, ở đâu, khi nào, tại sao — nếu có trong nguồn).
 Hình thức: Câu văn mạch lạc, đúng ngữ pháp, không dùng từ lóng hay giật tít.
 
 # QUY ĐỊNH VỀ ĐỊNH DẠNG (FORMATTING RULES) - BẮT BUỘC

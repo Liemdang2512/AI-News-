@@ -139,16 +139,20 @@ class Summarizer:
         if not html:
             return True
         low = html.lower()
-        block_signals = (
-            "document.cookie",
-            "window.location.reload",
+        # Các signal rõ ràng — chỉ một mình đã đủ để xác định là trang chặn
+        definite_signals = (
             "checking your browser",
             "cf-browser-verification",
-            "access denied",
             "captcha",
             "enable javascript and cookies to continue",
         )
-        return any(sig in low for sig in block_signals)
+        if any(sig in low for sig in definite_signals):
+            return True
+        # Cookie challenge — phải có CẢ HAI signal cùng lúc mới là trang chặn
+        # (tránh false-positive: nhiều trang hợp lệ có document.cookie trong tracking JS)
+        if "document.cookie" in low and "window.location.reload" in low:
+            return True
+        return False
 
     @staticmethod
     def _has_bullet_content(summary: str) -> bool:
