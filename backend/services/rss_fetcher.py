@@ -350,10 +350,25 @@ class RSSFetcher:
                 async with httpx.AsyncClient(timeout=20, follow_redirects=True, headers=headers, **proxy_kwargs) as client:
                     resp = await client.get(url)
                     content = resp.text
-                # Detect Cloudflare block → fallback to Playwright
-                if "Chờ một chút" in content or "cf-browser-verification" in content or resp.status_code in (403, 503):
-                    print(f"⚠️ hanoimoi blocked (status {resp.status_code}), trying Playwright...")
-                    content = await fetch_html_via_playwright(url)
+                # Detect Cloudflare block → fallback chain: cloudscraper → Playwright
+                if "Just a moment" in content or "Chờ một chút" in content or "cf-browser-verification" in content or resp.status_code in (403, 503):
+                    print(f"⚠️ hanoimoi blocked (status {resp.status_code}), trying cloudscraper...")
+                    try:
+                        import cloudscraper as _cs
+                        import asyncio as _asyncio
+                        scraper = _cs.create_scraper()
+                        _resp = await _asyncio.get_event_loop().run_in_executor(
+                            None, lambda: scraper.get(url, timeout=30)
+                        )
+                        if _resp.status_code == 200 and "b-grid" in _resp.text:
+                            print(f"   ✅ cloudscraper bypassed CF for {url}")
+                            content = _resp.text
+                        else:
+                            print(f"   ⚠️ cloudscraper failed (status {_resp.status_code}), trying Playwright...")
+                            content = await fetch_html_via_playwright(url)
+                    except Exception as _e:
+                        print(f"   ⚠️ cloudscraper error: {_e}, trying Playwright...")
+                        content = await fetch_html_via_playwright(url)
                 if not content:
                     return []
                 # Parse b-grid blocks
