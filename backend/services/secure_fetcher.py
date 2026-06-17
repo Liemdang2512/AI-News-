@@ -106,13 +106,7 @@ class SecureRSSFetcher:
         # Fallback 4: ScrapingAnt (free: 10k credits/month = 1000 JS renders, no CC required)
         # Sign up at https://scrapingant.com → add SCRAPINGANT_API_KEY to Vercel env vars
         print(f"🔄 Trying ScrapingAnt proxy for {url}...")
-        result = await self._fetch_via_scrapingant(url, timeout)
-        if result:
-            return result
-
-        # Fallback 5: Playwright headless Chrome (chỉ chạy được trên Railway/container, không phải Vercel)
-        print(f"🔄 Trying Playwright for {url}...")
-        return await self._fetch_via_playwright(url, timeout)
+        return await self._fetch_via_scrapingant(url, timeout)
 
     async def _fetch_via_rss2json_proxy(self, url: str, timeout: int = 30) -> str:
         """Fetch RSS via rss2json.com public API (works from Railway/datacenter IPs blocked by Cloudflare)"""
@@ -201,55 +195,6 @@ class SecureRSSFetcher:
         lines.append('</channel></rss>')
         return '\n'.join(lines)
     
-    async def _fetch_via_playwright(self, url: str, timeout: int = 30) -> str:
-        """Fetch RSS bằng Playwright headless Chrome — bypass Cloudflare Managed Challenge.
-        Chỉ chạy được trên Railway/Docker container (không phải Vercel serverless).
-        """
-        try:
-            from playwright.async_api import async_playwright
-        except ImportError:
-            print(f"⚠️ Playwright not installed, skipping")
-            return ""
-        try:
-            async with async_playwright() as p:
-                browser = await p.chromium.launch(
-                    headless=True,
-                    args=[
-                        "--no-sandbox",
-                        "--disable-setuid-sandbox",
-                        "--disable-dev-shm-usage",
-                        "--disable-gpu",
-                    ],
-                )
-                context = await browser.new_context(
-                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                    locale="vi-VN",
-                )
-                page = await context.new_page()
-                await page.goto(url, wait_until="networkidle", timeout=timeout * 1000)
-                content = await page.content()
-                await browser.close()
-
-                # Chromium wrap XML trong HTML — extract XML từ page source
-                xml_start = content.find('<?xml')
-                if xml_start < 0:
-                    xml_start = content.find('<rss')
-                if xml_start < 0:
-                    xml_start = content.find('<feed')
-                if xml_start >= 0:
-                    import html as _html
-                    content = content[xml_start:]
-                    if '&lt;' in content:
-                        content = _html.unescape(content)
-                    stripped = content.strip()
-                    if stripped.startswith('<?xml') or stripped.startswith('<rss') or stripped.startswith('<feed'):
-                        print(f"   ✅ Playwright: got RSS for {url}")
-                        return content
-                print(f"⚠️ Playwright got non-RSS content for {url}")
-        except Exception as e:
-            print(f"❌ Playwright error for {url}: {e}")
-        return ""
-
     async def fetch_multiple_rss(self, urls: list[str]) -> dict[str, str]:
         """
         Fetch multiple RSS feeds efficiently

@@ -8,9 +8,6 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Cài Chromium + tất cả system deps (--with-deps tự handle apt cho đúng Debian version)
-RUN playwright install --with-deps chromium
-
 # Copy toàn bộ code backend vào container
 COPY . .
 
