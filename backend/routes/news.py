@@ -157,6 +157,23 @@ async def debug_hanoimoi():
     except Exception as e:
         result["playwright_error"] = str(e)
 
+    # Step 5: CloakBrowser (stealth Chromium with source-level fingerprint patches)
+    try:
+        from cloakbrowser import launch_async
+        browser = await launch_async(headless=True)
+        page = await browser.new_page()
+        await page.set_extra_http_headers({"Accept-Language": "vi-VN,vi;q=0.9"})
+        response = await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+        await page.wait_for_timeout(3000)
+        content = await page.content()
+        await browser.close()
+        result["cloakbrowser_status"] = response.status if response else "N/A"
+        result["cloakbrowser_has_bgrid"] = "b-grid" in content
+        result["cloakbrowser_cf_block"] = "Just a moment" in content or "Chờ một chút" in content
+        result["cloakbrowser_len"] = len(content)
+    except Exception as e:
+        result["cloakbrowser_error"] = str(e)
+
     return result
 
 

@@ -18,6 +18,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Cài Chromium cho Playwright (chỉ Chromium, không cần Firefox/WebKit)
 RUN playwright install chromium
 
+# Pre-download CloakBrowser stealth binary
+RUN python -c "from cloakbrowser import ensure_binary; ensure_binary()"
+
 # Copy toàn bộ code backend vào container
 COPY . .
 
