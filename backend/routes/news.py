@@ -133,6 +133,30 @@ async def debug_hanoimoi():
     except Exception as e:
         result["curl_cffi_error"] = str(e)
 
+    # Step 4: Playwright headless Chromium
+    try:
+        from playwright.async_api import async_playwright
+        async with async_playwright() as pw:
+            browser = await pw.chromium.launch(
+                headless=True,
+                args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage",
+                      "--disable-blink-features=AutomationControlled"],
+            )
+            context = await browser.new_context(
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                locale="vi-VN",
+            )
+            page = await context.new_page()
+            await page.goto(url, timeout=30000, wait_until="domcontentloaded")
+            await page.wait_for_timeout(5000)
+            content = await page.content()
+            await browser.close()
+        result["playwright_has_bgrid"] = "b-grid" in content
+        result["playwright_cf_block"] = "Just a moment" in content or "Chờ một chút" in content
+        result["playwright_len"] = len(content)
+    except Exception as e:
+        result["playwright_error"] = str(e)
+
     return result
 
 
