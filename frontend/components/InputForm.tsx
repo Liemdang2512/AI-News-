@@ -16,9 +16,10 @@ const availableNewspapers = [
     'Sài Gòn Giải Phóng',
     'VietnamPlus',
     'Tiền Phong',
-    // 'Báo VOV',
+    'Báo VOV',
     'Báo tin tức',
-    'Báo tuổi trẻ'
+    'Báo tuổi trẻ',
+    'Thanh Niên',
 ];
 
 export default function InputForm({ onSubmit, loading }: InputFormProps) {

@@ -27,6 +27,12 @@ def _resolve_api_key(header_key: Optional[str]) -> Optional[str]:
         return settings.OPENAI_API_KEY or None
     return settings.GEMINI_API_KEY or None
 
+def _resolve_gemini_key(header_key: Optional[str]) -> Optional[str]:
+    """Luôn trả về Gemini key — dùng cho dedup/nhandan (chạy Gemini bất kể AI_PROVIDER)."""
+    if header_key:
+        return header_key
+    return settings.GEMINI_API_KEY or None
+
 @router.get("/models")
 async def list_models(x_api_key: Optional[str] = Header(None)):
     """List available Gemini models"""
@@ -116,14 +122,14 @@ async def fetch_articles(
         # Phase 2: Semantic duplicate detection (RE-ENABLED with advanced prompt)
         if len(articles) > 1:
             articles = await dedup_service.cluster_articles_semantically(
-                articles, 
-                api_key=_resolve_api_key(x_api_key)
+                articles,
+                api_key=_resolve_gemini_key(x_api_key)
             )
-        
+
         # Phase 2: Check Nhan Dan official coverage (ENABLED)
         articles = await nhandan_fetcher.check_official_coverage(
             articles,
-            api_key=_resolve_api_key(x_api_key)
+            api_key=_resolve_gemini_key(x_api_key)
         )
         
         return FetchArticlesResponse(articles=articles)
@@ -161,15 +167,15 @@ async def fetch_articles_stream(
             yield f"data: {json.dumps({'step': 'fetch_rss', 'status': 'done', 'message': f'✅ Đã tải {len(articles)} bài viết'}, ensure_ascii=False)}\n\n"
 
             # Step 2: Deduplication
-            if len(articles) > 1 and x_api_key:
+            if len(articles) > 1 and _resolve_gemini_key(x_api_key):
                 logger.info("stream.sse.step", extra={"event": "dedup", "status": "running", "request_id": _rid})
                 yield f"data: {json.dumps({'step': 'dedup', 'status': 'running', 'message': 'Đang phân tích trùng lặp (AI)...'}, ensure_ascii=False)}\n\n"
-                
+
                 articles = await dedup_service.cluster_articles_semantically(
-                    articles, 
-                    api_key=_resolve_api_key(x_api_key)
+                    articles,
+                    api_key=_resolve_gemini_key(x_api_key)
                 )
-                
+
                 # Count duplicates
                 duplicate_count = sum(1 for a in articles if a.get('duplicate_count', 0) > 0)
                 logger.info("stream.sse.step", extra={"event": "dedup", "status": "done", "duplicate_count": duplicate_count, "request_id": _rid})
@@ -177,15 +183,15 @@ async def fetch_articles_stream(
             else:
                 logger.debug("stream.sse.step", extra={"event": "dedup", "status": "skipped", "request_id": _rid})
                 yield f"data: {json.dumps({'step': 'dedup', 'status': 'skipped', 'message': '⊘ Bỏ qua phân tích trùng lặp'}, ensure_ascii=False)}\n\n"
-            
+
             # Step 3: Nhan Dan Verification
-            if x_api_key:
+            if _resolve_gemini_key(x_api_key):
                 logger.info("stream.sse.step", extra={"event": "verification", "status": "running", "request_id": _rid})
                 yield f"data: {json.dumps({'step': 'verification', 'status': 'running', 'message': 'Đang xác thực Báo Nhân Dân...'}, ensure_ascii=False)}\n\n"
-                
+
                 articles = await nhandan_fetcher.check_official_coverage(
                     articles,
-                    api_key=_resolve_api_key(x_api_key)
+                    api_key=_resolve_gemini_key(x_api_key)
                 )
                 
                 verified_count = sum(1 for a in articles if a.get('official_source_link'))

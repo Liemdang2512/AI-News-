@@ -433,7 +433,7 @@ class Summarizer:
                 # Nếu fetch thất bại, dùng title + RSS description làm content
                 if not content or len(content.strip()) < self._MIN_CHARS_TO_SUMMARIZE:
                     fallback_content = f"{title}\n\n{rss_plain}".strip()
-                    if len(fallback_content) >= 60:
+                    if fallback_content:
                         content = fallback_content
                         print(f"   ℹ️ Dùng title+RSS làm content ({len(content)} ký tự): {url[:50]}")
                     else:

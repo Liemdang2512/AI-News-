@@ -232,8 +232,14 @@ Trả về kết quả dưới dạng JSON Array, không kèm lời giải thíc
             elif "```" in response_text:
                 response_text = response_text.split("```")[1].split("```")[0].strip()
             
-            results = json.loads(response_text)
-            
+            try:
+                results = json.loads(response_text)
+            except json.JSONDecodeError:
+                import re as _re
+                cleaned = _re.sub(r'//[^\n]*', '', response_text)
+                cleaned = _re.sub(r',\s*([}\]])', r'\1', cleaned)
+                results = json.loads(cleaned)
+
             # Apply results to articles
             for result in results:
                 idx = result.get('article_index')

@@ -190,9 +190,16 @@ Lưu ý:
             try:
                 clusters = json.loads(response_text)
             except json.JSONDecodeError as json_err:
-                print(f"❌ JSON Parse Error: {json_err}")
-                print(f"Response text (first 500 chars): {response_text[:500]}")
-                raise  # Re-raise to trigger fallback
+                import re as _re
+                # Strip // comments và trailing commas (Gemini hay thêm)
+                cleaned = _re.sub(r'//[^\n]*', '', response_text)
+                cleaned = _re.sub(r',\s*([}\]])', r'\1', cleaned)
+                try:
+                    clusters = json.loads(cleaned)
+                except json.JSONDecodeError:
+                    print(f"❌ JSON Parse Error: {json_err}")
+                    print(f"Response text (first 500 chars): {response_text[:500]}")
+                    raise json_err
             
             # Assign group_id to articles
             for group in clusters.get('groups', []):

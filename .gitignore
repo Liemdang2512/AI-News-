@@ -39,3 +39,4 @@ yarn-debug.log*
 .claude/
 .planning/
 .vercel
+.harness/

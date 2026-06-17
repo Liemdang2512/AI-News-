@@ -43,6 +43,9 @@ class RSSMatcher:
             "báo tuổi trẻ": "tuoitre.vn",
             "tuổi trẻ": "tuoitre.vn",
             "tuoitre": "tuoitre.vn",
+            "thanh niên": "thanhnien.vn",
+            "thanhnien": "thanhnien.vn",
+            "báo thanh niên": "thanhnien.vn",
         }
         
         # Find matching domains

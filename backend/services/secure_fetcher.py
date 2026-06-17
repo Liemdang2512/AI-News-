@@ -48,7 +48,7 @@ class SecureRSSFetcher:
             try:
                 async with AsyncSession(impersonate=self.impersonate, headers=self.headers) as session:
                     response = await session.get(url, timeout=timeout, allow_redirects=True)
-                    
+
                     # Check for cookie challenge (Lao Dong specific)
                     # Response usually contains: document.cookie="KEY=VALUE"+...
                     if "document.cookie" in response.text and "window.location.reload" in response.text:
@@ -64,28 +64,30 @@ class SecureRSSFetcher:
                                 # Clean up value (sometimes has extra chars if not parsed perfectly, but usually clean)
                                 # Add cookie to session
                                 session.cookies.set(key, value)
-                                
+
                                 print(f"🔄 Detected cookie challenge for {url}. Retrying with cookie: {key}={value[:10]}...")
                                 # Retry request
                                 response = await session.get(url, timeout=timeout)
-                                
-                    return response.text
+
+                    content = response.text
+                    if content and len(content.strip()) > 100:
+                        return content
+                    print(f"⚠️ curl_cffi returned empty/short response for {url}, trying httpx fallback")
             except Exception as e:
-                print(f"❌ curl_cffi error for {url}: {str(e)}")
-                return ""
-        else:
-            # Fallback to httpx (for Vercel/serverless environments)
-            try:
-                async with httpx.AsyncClient(
-                    timeout=timeout,
-                    follow_redirects=True,
-                    headers=self.headers
-                ) as client:
-                    response = await client.get(url)
-                    return response.text
-            except Exception as e:
-                print(f"❌ httpx error for {url}: {str(e)}")
-                return ""
+                print(f"⚠️ curl_cffi error for {url}: {str(e)}, trying httpx fallback")
+
+        # Fallback to httpx (for Vercel/serverless OR when curl_cffi fails/is unavailable)
+        try:
+            async with httpx.AsyncClient(
+                timeout=timeout,
+                follow_redirects=True,
+                headers=self.headers
+            ) as client:
+                response = await client.get(url)
+                return response.text
+        except Exception as e:
+            print(f"❌ httpx error for {url}: {str(e)}")
+            return ""
     
     async def fetch_multiple_rss(self, urls: list[str]) -> dict[str, str]:
         """

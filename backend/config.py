@@ -121,6 +121,16 @@ class Settings:
         "https://nhandan.vn/rss/phapluat-1287.rss",
         "https://nhandan.vn/rss/xahoi-1211.rss",
         "https://nhandan.vn/rss/thegioi-1231.rss",
+        # Báo Thanh Niên
+        "https://thanhnien.vn/rss/thoi-su.rss",
+        "https://thanhnien.vn/rss/the-gioi.rss",
+        "https://thanhnien.vn/rss/kinh-te.rss",
+        "https://thanhnien.vn/rss/thoi-su/phap-luat.rss",
+        # VOV (Đài Tiếng nói Việt Nam) - vov.gov.vn
+        "https://vov.gov.vn/Rss/RssCategoryExport?categoryId=1091",  # Thời sự → XÃ HỘI
+        "https://vov.gov.vn/Rss/RssCategoryExport?categoryId=1094",  # Thế giới → THẾ GIỚI
+        "https://vov.gov.vn/Rss/RssCategoryExport?categoryId=1096",  # Kinh tế → KINH TẾ
+        "https://vov.gov.vn/Rss/RssCategoryExport?categoryId=1127",  # Pháp luật → PHÁP LUẬT
     ]
 
 

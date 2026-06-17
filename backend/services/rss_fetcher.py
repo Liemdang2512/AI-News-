@@ -1,5 +1,6 @@
 import asyncio
 import feedparser
+import html
 import httpx
 from typing import List, Dict, Optional
 from datetime import datetime, time
@@ -47,7 +48,9 @@ class RSSFetcher:
         "tuoitre.vn": "TUỔI TRẺ",
         "cafef.vn": "CAFEF",
         "vov.vn": "VOV",
+        "vov.gov.vn": "VOV",
         "baotintuc.vn": "BÁO TIN TỨC",
+        "thanhnien.vn": "THANH NIÊN",
     }
 
     @staticmethod
@@ -62,6 +65,7 @@ class RSSFetcher:
             return ""
 
         text = re.sub(r"<[^>]+>", " ", raw_description)
+        text = html.unescape(text)
         text = re.sub(r"\s+", " ", text).strip()
 
         # Chuẩn hóa phần kết thúc nếu RSS đã cắt ngắn
@@ -119,7 +123,29 @@ class RSSFetcher:
                     if content:
                         feed = feedparser.parse(content)
                         print(f"   ✅ {rss_url}: {len(feed.entries)} entries")
-                        
+
+                        # Hà Nội Mới: double-escaped CDATA → feedparser trả về empty description/image
+                        # Giải pháp: extract trực tiếp từ raw XML bằng regex
+                        hanoimoi_extras: dict = {}
+                        if 'hanoimoi' in rss_url:
+                            # Extract từng <item> block và lấy link, img src, description text
+                            for item_xml in re.findall(r'<item>(.*?)</item>', content, re.DOTALL):
+                                link_m = re.search(r'<link>([^<]+)</link>', item_xml)
+                                if not link_m:
+                                    continue
+                                item_url = link_m.group(1).strip()
+                                # Unescape CDATA content để extract
+                                cdata_m = re.search(r'&lt;!\[CDATA\[(.*?)\]\]&gt;', item_xml, re.DOTALL)
+                                if cdata_m:
+                                    inner = html.unescape(cdata_m.group(1))
+                                    img_m = re.search(r'<img[^>]+src=["\']([^"\']+)["\']', inner)
+                                    text = re.sub(r'<[^>]+>', ' ', inner).strip()
+                                    text = re.sub(r'\s+', ' ', text)
+                                    hanoimoi_extras[item_url] = {
+                                        'thumbnail': img_m.group(1) if img_m else '',
+                                        'description': text,
+                                    }
+
                         # Process each entry
                         for entry in feed.entries:
                             article = self._process_entry(
@@ -130,6 +156,13 @@ class RSSFetcher:
                                 rss_url
                             )
                             if article:
+                                # Patch Hà Nội Mới extras nếu có
+                                if 'hanoimoi' in rss_url:
+                                    extras = hanoimoi_extras.get(article['url'], {})
+                                    if extras.get('thumbnail'):
+                                        article['thumbnail'] = extras['thumbnail']
+                                    if extras.get('description') and not article['description']:
+                                        article['description'] = extras['description']
                                 all_articles.append(article)
                     else:
                         print(f"   ❌ {rss_url}: No content fetched")
@@ -165,12 +198,60 @@ class RSSFetcher:
                     print(f"   ❌ {rss_url}: {str(e)}")
                     return []
 
+            async def _fetch_vov_paginated(client: httpx.AsyncClient, rss_url: str, max_pages: int = 3) -> List[Dict]:
+                """Fetch VOV RSS qua nhiều trang để bắt đúng khung giờ cần lấy."""
+                articles = []
+                for page in range(1, max_pages + 1):
+                    page_url = rss_url if page == 1 else f"{rss_url}&page={page}"
+                    try:
+                        response = await client.get(page_url)
+                        feed = feedparser.parse(response.text)
+                        if not feed.entries:
+                            print(f"   VOV page {page}: empty → stop")
+                            break
+
+                        print(f"   VOV page {page}: {len(feed.entries)} entries")
+                        all_before_target = True
+
+                        for entry in feed.entries:
+                            pub_str = entry.get("published", "")
+                            if pub_str:
+                                try:
+                                    pd = date_parser.parse(_normalize_gmt_offset(pub_str))
+                                    if pd.tzinfo:
+                                        pd = pd.astimezone(VN_TZ)
+                                    else:
+                                        from datetime import timezone as _tz
+                                        pd = pd.replace(tzinfo=_tz.utc).astimezone(VN_TZ)
+                                    if pd.date() >= target_dt.date():
+                                        all_before_target = False
+                                except Exception:
+                                    all_before_target = False
+
+                            article = self._process_entry(entry, target_dt, start_time, end_time, rss_url)
+                            if article:
+                                articles.append(article)
+
+                        if all_before_target:
+                            print(f"   VOV page {page}: tất cả bài cũ hơn ngày cần → stop")
+                            break
+                    except Exception as e:
+                        print(f"   VOV page {page} error: {str(e)}")
+                        break
+                return articles
+
             async with httpx.AsyncClient(
                 timeout=30.0,
                 follow_redirects=True,
                 headers=headers
             ) as client:
-                results = await asyncio.gather(*[_fetch_one(client, url) for url in normal_urls])
+                tasks = []
+                for url in normal_urls:
+                    if 'vov.gov.vn' in url:
+                        tasks.append(_fetch_vov_paginated(client, url))
+                    else:
+                        tasks.append(_fetch_one(client, url))
+                results = await asyncio.gather(*tasks)
                 for article_list in results:
                     all_articles.extend(article_list)
         
@@ -261,7 +342,7 @@ class RSSFetcher:
             raw_description = entry.get("description", "") or entry.get("summary", "")
             return {
                 "url": entry.get("link", ""),
-                "title": entry.get("title", ""),
+                "title": html.unescape(entry.get("title", "")),
                 "category": category,
                 "published_at": pub_date.astimezone(VN_TZ).strftime("%H:%M %d/%m/%Y"),
                 "description": self._clean_description(raw_description),
@@ -294,9 +375,23 @@ class RSSFetcher:
         Examples:
         - https://tienphong.vn/rss/phap-luat-12.rss -> PHÁP LUẬT
         - https://laodong.vn/rss/kinh-doanh.rss -> KINH TẾ
+        - https://vov.gov.vn/Rss/RssCategoryExport?categoryId=1094 -> THẾ GIỚI
         """
         url_lower = rss_url.lower()
-        
+
+        # vov.gov.vn uses categoryId query params
+        VOV_CATEGORY_MAP = {
+            "1091": "XÃ HỘI",   # Thời sự
+            "1094": "THẾ GIỚI",  # Thế giới
+            "1096": "KINH TẾ",   # Kinh tế
+            "1127": "PHÁP LUẬT", # Pháp luật
+        }
+        if "vov.gov.vn" in url_lower:
+            import re as _re
+            m = _re.search(r"categoryid=(\d+)", url_lower)
+            if m and m.group(1) in VOV_CATEGORY_MAP:
+                return VOV_CATEGORY_MAP[m.group(1)]
+
         # Category mapping from URL keywords
         if any(keyword in url_lower for keyword in ['phap-luat', 'phapluat', 'phap_luat']):
             return "PHÁP LUẬT"
