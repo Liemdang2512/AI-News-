@@ -195,9 +195,10 @@ class SecureRSSFetcher:
                     extra_http_headers={"Accept-Language": "vi-VN,vi;q=0.9,en;q=0.8"},
                 )
                 page = await context.new_page()
-                await page.goto(url, timeout=timeout * 1000, wait_until="networkidle")
-                # Cloudflare challenge needs a few seconds to resolve
-                await page.wait_for_timeout(3000)
+                # Use "domcontentloaded" — "networkidle" hangs on Cloudflare challenge pages
+                await page.goto(url, timeout=60000, wait_until="domcontentloaded")
+                # Wait for Cloudflare JS challenge to resolve (needs JS execution time)
+                await page.wait_for_timeout(5000)
                 content = await page.content()
                 await browser.close()
 
