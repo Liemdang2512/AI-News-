@@ -90,6 +90,42 @@ class SummarizeResponse(BaseModel):
     summary: str
 
 
+@router.get("/debug/hanoimoi")
+async def debug_hanoimoi():
+    """Debug: test raw fetch of hanoimoi.vn/xa-hoi and return status info."""
+    import httpx
+    url = "https://hanoimoi.vn/xa-hoi"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept-Language": "vi-VN,vi;q=0.9",
+    }
+    result = {}
+    # Step 1: httpx
+    try:
+        async with httpx.AsyncClient(timeout=15, follow_redirects=True, headers=headers) as client:
+            r = await client.get(url)
+        result["httpx_status"] = r.status_code
+        result["httpx_len"] = len(r.text)
+        result["httpx_has_bgrid"] = "b-grid" in r.text
+        result["httpx_cf_block"] = "Just a moment" in r.text or "Chờ một chút" in r.text
+    except Exception as e:
+        result["httpx_error"] = str(e)
+
+    # Step 2: cloudscraper
+    try:
+        import cloudscraper as _cs, asyncio as _asyncio
+        scraper = _cs.create_scraper()
+        _r = await _asyncio.get_event_loop().run_in_executor(None, lambda: scraper.get(url, timeout=30))
+        result["cloudscraper_status"] = _r.status_code
+        result["cloudscraper_len"] = len(_r.text)
+        result["cloudscraper_has_bgrid"] = "b-grid" in _r.text
+        result["cloudscraper_cf_block"] = "Just a moment" in _r.text or "Chờ một chút" in _r.text
+    except Exception as e:
+        result["cloudscraper_error"] = str(e)
+
+    return result
+
+
 @router.post("/rss/match", response_model=MatchRSSResponse)
 async def match_rss_feeds(request: MatchRSSRequest):
     """
