@@ -102,16 +102,26 @@ class RSSFetcher:
         
         all_articles = []
         
-        # Separate URLs by whether they need Secure Fetcher (anti-bot protection)
+        # Separate URLs by fetch strategy
+        hanoimoi_html_urls = []  # scrape HTML directly (RSS blocked by Cloudflare)
         secure_urls = []
         normal_urls = []
-        
+
         for url in rss_urls:
-            # Lao Dong and Hanoi Moi need secure fetcher (anti-bot or IP blocking)
-            if 'laodong.vn' in url.lower() or 'hanoimoi.vn' in url.lower():
+            if 'hanoimoi.vn' in url.lower() and '/rss/' not in url.lower():
+                hanoimoi_html_urls.append(url)
+            elif 'laodong.vn' in url.lower():
                 secure_urls.append(url)
             else:
                 normal_urls.append(url)
+
+        # Scrape Hà Nội Mới HTML (RSS is Cloudflare-blocked)
+        if hanoimoi_html_urls:
+            print(f"🗞️ Scraping Hà Nội Mới HTML for {len(hanoimoi_html_urls)} category pages")
+            hnm_articles = await self._scrape_hanoimoi_html(
+                hanoimoi_html_urls, target_dt, start_time, end_time
+            )
+            all_articles.extend(hnm_articles)
         
         # Fetch Secure URLs (Lao Dong with anti-bot protection)
         if secure_urls:
@@ -275,7 +285,84 @@ class RSSFetcher:
         end_time = time(end_hour, end_min)
         
         return start_time, end_time
-    
+
+    async def _scrape_hanoimoi_html(
+        self,
+        urls: list,
+        target_dt: datetime,
+        start_time: time,
+        end_time: time,
+    ) -> list:
+        """Scrape Hà Nội Mới category pages (HTML) — RSS is Cloudflare-blocked."""
+        CATEGORY_MAP = {
+            "xa-hoi": "XÃ HỘI",
+            "the-gioi": "THẾ GIỚI",
+            "phap-luat": "PHÁP LUẬT",
+            "kinh-te": "KINH TẾ",
+        }
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "vi-VN,vi;q=0.9,en;q=0.8",
+        }
+        articles = []
+
+        async def fetch_one(url):
+            slug = url.rstrip("/").split("/")[-1]
+            category = CATEGORY_MAP.get(slug, slug.upper().replace("-", " "))
+            try:
+                async with httpx.AsyncClient(timeout=20, follow_redirects=True, headers=headers) as client:
+                    resp = await client.get(url)
+                    content = resp.text
+                # Detect Cloudflare block
+                if "Chờ một chút" in content or resp.status_code != 200:
+                    print(f"⚠️ hanoimoi HTML blocked for {url} (status {resp.status_code})")
+                    return []
+                # Parse b-grid blocks
+                result = []
+                for block in re.findall(r'<div class="b-grid">(.*?)</div>\s*</div>\s*</div>', content, re.DOTALL):
+                    link_m = re.search(r'href="(https://hanoimoi\.vn/[^"]+\.html)"', block)
+                    title_m = re.search(r'b-grid__title[^>]*>.*?<a[^>]*>([^<]+)</a>', block, re.DOTALL)
+                    img_m = re.search(r'<img[^>]+src="([^"]+)"', block)
+                    date_m = re.search(r'b-grid__time">([^<]+)<', block)
+                    if not (link_m and title_m and date_m):
+                        continue
+                    # Parse date: "17/06/2026 - 11:02"
+                    try:
+                        pub_dt = datetime.strptime(date_m.group(1).strip(), "%d/%m/%Y - %H:%M")
+                        pub_dt = pub_dt.replace(tzinfo=VN_TZ)
+                    except ValueError:
+                        continue
+                    if pub_dt.date() != target_dt.date():
+                        continue
+                    pub_time = pub_dt.time().replace(tzinfo=None)
+                    if end_time >= start_time:
+                        if not (start_time <= pub_time <= end_time):
+                            continue
+                    else:
+                        if not (pub_time >= start_time or pub_time <= end_time):
+                            continue
+                    result.append({
+                        "url": link_m.group(1),
+                        "title": html.unescape(title_m.group(1).strip()),
+                        "category": category,
+                        "published_at": pub_dt.strftime("%H:%M %d/%m/%Y"),
+                        "description": "",
+                        "source": "HÀ NỘI MỚI",
+                        "thumbnail": img_m.group(1) if img_m else "",
+                    })
+                print(f"   ✅ hanoimoi {url}: {len(result)} bài")
+                return result
+            except Exception as e:
+                print(f"❌ hanoimoi scrape error {url}: {e}")
+                return []
+
+        import asyncio as _asyncio
+        results = await _asyncio.gather(*[fetch_one(u) for u in urls])
+        for r in results:
+            articles.extend(r)
+        return articles
+
     def _process_entry(
         self,
         entry: Dict,
