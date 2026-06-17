@@ -1,11 +1,8 @@
 .env
-/.env
-.venv
-**/__pycache__
+venv/
+.venv/
+__pycache__/
+*.pyc
 *.log
+*.png
 backend.log
-frontend.log
-frontend-prod.log
-**/.pytest_cache
-**/.DS_Store
-
