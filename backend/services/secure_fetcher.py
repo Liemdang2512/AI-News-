@@ -89,10 +89,58 @@ class SecureRSSFetcher:
                 headers=self.headers
             ) as client:
                 response = await client.get(url)
-                return response.text
+                content = response.text
+                stripped = content.strip()
+                if stripped.startswith('<?xml') or stripped.startswith('<rss') or stripped.startswith('<feed'):
+                    return content
+                print(f"⚠️ httpx got non-RSS response for {url}, trying rss2json proxy")
         except Exception as e:
-            print(f"❌ httpx error for {url}: {str(e)}")
-            return ""
+            print(f"⚠️ httpx error for {url}: {str(e)}, trying rss2json proxy")
+
+        # Last resort: rss2json.com proxy — bypasses Cloudflare datacenter IP blocks
+        print(f"🔄 Trying rss2json.com proxy for {url}...")
+        return await self._fetch_via_rss2json_proxy(url, timeout)
+
+    async def _fetch_via_rss2json_proxy(self, url: str, timeout: int = 30) -> str:
+        """Fetch RSS via rss2json.com public API (works from Railway/datacenter IPs blocked by Cloudflare)"""
+        import urllib.parse
+        import html as _html
+        proxy_url = f"https://api.rss2json.com/v1/api.json?rss_url={urllib.parse.quote(url, safe='')}"
+        try:
+            async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+                response = await client.get(proxy_url)
+                data = response.json()
+                if data.get('status') == 'ok' and data.get('items'):
+                    print(f"   ✅ rss2json proxy: {len(data['items'])} items for {url}")
+                    return self._rss2json_to_rss_xml(data)
+                print(f"⚠️ rss2json proxy returned status={data.get('status')} for {url}")
+        except Exception as e:
+            print(f"❌ rss2json proxy error for {url}: {e}")
+        return ""
+
+    def _rss2json_to_rss_xml(self, data: dict) -> str:
+        """Convert rss2json API JSON response to RSS XML for feedparser compatibility"""
+        import html as _html
+        lines = ['<?xml version="1.0" encoding="utf-8"?>', '<rss version="2.0"><channel>']
+        feed = data.get('feed', {})
+        lines.append(f"<title>{_html.escape(feed.get('title', ''))}</title>")
+        for item in data.get('items', []):
+            lines.append('<item>')
+            lines.append(f"<title><![CDATA[{item.get('title', '')}]]></title>")
+            lines.append(f"<link>{_html.escape(item.get('link', ''))}</link>")
+            # rss2json returns pubDate in "YYYY-MM-DD HH:MM:SS" UTC format
+            lines.append(f"<pubDate>{item.get('pubDate', '')}</pubDate>")
+            desc = item.get('description', '') or item.get('content', '')
+            lines.append(f"<description><![CDATA[{desc}]]></description>")
+            thumbnail = item.get('thumbnail', '')
+            if not thumbnail:
+                enc = item.get('enclosure') or {}
+                thumbnail = enc.get('link', '')
+            if thumbnail:
+                lines.append(f'<media:content url="{_html.escape(thumbnail)}" medium="image"/>')
+            lines.append('</item>')
+        lines.append('</channel></rss>')
+        return '\n'.join(lines)
     
     async def fetch_multiple_rss(self, urls: list[str]) -> dict[str, str]:
         """
