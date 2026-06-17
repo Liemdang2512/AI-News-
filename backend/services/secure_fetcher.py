@@ -103,10 +103,15 @@ class SecureRSSFetcher:
         if result:
             return result
 
-        # Fallback 4: ScrapingAnt (free: 10k credits/month = 1000 JS renders, no CC required)
-        # Sign up at https://scrapingant.com → add SCRAPINGANT_API_KEY to Vercel env vars
+        # Fallback 4: ScrapingAnt
         print(f"🔄 Trying ScrapingAnt proxy for {url}...")
-        return await self._fetch_via_scrapingant(url, timeout)
+        result = await self._fetch_via_scrapingant(url, timeout)
+        if result:
+            return result
+
+        # Fallback 5: Playwright Chromium (last resort for Cloudflare-protected sites)
+        print(f"🔄 Trying Playwright fallback for {url}...")
+        return await self._fetch_via_playwright(url, timeout)
 
     async def _fetch_via_rss2json_proxy(self, url: str, timeout: int = 30) -> str:
         """Fetch RSS via rss2json.com public API (works from Railway/datacenter IPs blocked by Cloudflare)"""
@@ -169,6 +174,48 @@ class SecureRSSFetcher:
                 print(f"⚠️ ScrapingAnt returned non-RSS content for {url}")
         except Exception as e:
             print(f"❌ ScrapingAnt error for {url}: {e}")
+        return ""
+
+    async def _fetch_via_playwright(self, url: str, timeout: int = 30) -> str:
+        """Fetch RSS via headless Chromium (Playwright). Bypasses Cloudflare JS challenge."""
+        try:
+            from playwright.async_api import async_playwright
+        except ImportError:
+            print("⚠️ Playwright not installed, skipping")
+            return ""
+        try:
+            async with async_playwright() as pw:
+                browser = await pw.chromium.launch(
+                    headless=True,
+                    args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
+                )
+                context = await browser.new_context(
+                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                    locale="vi-VN",
+                    extra_http_headers={"Accept-Language": "vi-VN,vi;q=0.9,en;q=0.8"},
+                )
+                page = await context.new_page()
+                await page.goto(url, timeout=timeout * 1000, wait_until="networkidle")
+                # Cloudflare challenge needs a few seconds to resolve
+                await page.wait_for_timeout(3000)
+                content = await page.content()
+                await browser.close()
+
+                import html as _html
+                # Browser wraps XML in HTML - extract raw XML
+                for marker in ["<?xml", "<rss", "<feed"]:
+                    idx = content.find(marker)
+                    if idx >= 0:
+                        content = content[idx:]
+                        if "&lt;" in content:
+                            content = _html.unescape(content)
+                        stripped = content.strip()
+                        if stripped.startswith("<?xml") or stripped.startswith("<rss") or stripped.startswith("<feed"):
+                            print(f"   ✅ Playwright: got RSS for {url}")
+                            return content
+                print(f"⚠️ Playwright got non-RSS content for {url}")
+        except Exception as e:
+            print(f"❌ Playwright error for {url}: {e}")
         return ""
 
     def _rss2json_to_rss_xml(self, data: dict) -> str:
