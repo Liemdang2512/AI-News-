@@ -97,9 +97,16 @@ class SecureRSSFetcher:
         except Exception as e:
             print(f"⚠️ httpx error for {url}: {str(e)}, trying rss2json proxy")
 
-        # Last resort: rss2json.com proxy — bypasses Cloudflare datacenter IP blocks
+        # Fallback 3: rss2json.com proxy
         print(f"🔄 Trying rss2json.com proxy for {url}...")
-        return await self._fetch_via_rss2json_proxy(url, timeout)
+        result = await self._fetch_via_rss2json_proxy(url, timeout)
+        if result:
+            return result
+
+        # Fallback 4: ScrapingAnt (free: 10k credits/month = 1000 JS renders, no CC required)
+        # Sign up at https://scrapingant.com → add SCRAPINGANT_API_KEY to Vercel env vars
+        print(f"🔄 Trying ScrapingAnt proxy for {url}...")
+        return await self._fetch_via_scrapingant(url, timeout)
 
     async def _fetch_via_rss2json_proxy(self, url: str, timeout: int = 30) -> str:
         """Fetch RSS via rss2json.com public API (works from Railway/datacenter IPs blocked by Cloudflare)"""
@@ -116,6 +123,52 @@ class SecureRSSFetcher:
                 print(f"⚠️ rss2json proxy returned status={data.get('status')} for {url}")
         except Exception as e:
             print(f"❌ rss2json proxy error for {url}: {e}")
+        return ""
+
+    async def _fetch_via_scrapingant(self, url: str, timeout: int = 30) -> str:
+        """Fetch RSS via ScrapingAnt API with JS rendering + residential proxies.
+        Free plan: 10,000 credits/month = ~1,000 JS-rendered requests.
+        Sign up at https://scrapingant.com (no credit card required).
+        """
+        import os
+        import html as _html
+        api_key = os.environ.get('SCRAPINGANT_API_KEY', '')
+        if not api_key:
+            print(f"⚠️ SCRAPINGANT_API_KEY not set, skipping ScrapingAnt fallback")
+            return ""
+        try:
+            async with httpx.AsyncClient(timeout=timeout + 10) as client:
+                response = await client.get(
+                    "https://api.scrapingant.com/v2/general",
+                    params={
+                        "url": url,
+                        "x-api-key": api_key,
+                        "browser": "true",
+                    }
+                )
+                if response.status_code != 200:
+                    print(f"⚠️ ScrapingAnt returned HTTP {response.status_code} for {url}")
+                    return ""
+                content = response.text
+                # When a browser loads RSS XML, Chrome wraps it in HTML.
+                # Extract raw XML if present.
+                xml_start = content.find('<?xml')
+                if xml_start < 0:
+                    xml_start = content.find('<rss')
+                if xml_start < 0:
+                    xml_start = content.find('<feed')
+                if xml_start >= 0:
+                    content = content[xml_start:]
+                    # Unescape HTML entities (browser may encode < as &lt; in pre tags)
+                    if '&lt;' in content:
+                        content = _html.unescape(content)
+                    stripped = content.strip()
+                    if stripped.startswith('<?xml') or stripped.startswith('<rss') or stripped.startswith('<feed'):
+                        print(f"   ✅ ScrapingAnt: got RSS for {url}")
+                        return content
+                print(f"⚠️ ScrapingAnt returned non-RSS content for {url}")
+        except Exception as e:
+            print(f"❌ ScrapingAnt error for {url}: {e}")
         return ""
 
     def _rss2json_to_rss_xml(self, data: dict) -> str:
