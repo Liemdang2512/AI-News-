@@ -307,16 +307,54 @@ class RSSFetcher:
         }
         articles = []
 
+        import os
+        proxy_url = os.environ.get("WEBSHARE_PROXY_URL", "")
+        proxy_kwargs = {"proxy": proxy_url} if proxy_url else {}
+        if proxy_url:
+            print(f"🔀 Using Webshare proxy for hanoimoi scrape")
+
+        async def fetch_html_via_playwright(url: str) -> str:
+            """Dùng Playwright để vượt Cloudflare JS challenge."""
+            try:
+                from playwright.async_api import async_playwright
+            except ImportError:
+                print("⚠️ Playwright not installed")
+                return ""
+            try:
+                async with async_playwright() as pw:
+                    browser = await pw.chromium.launch(
+                        headless=True,
+                        args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage",
+                              "--disable-blink-features=AutomationControlled"],
+                    )
+                    context = await browser.new_context(
+                        user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                        locale="vi-VN",
+                        extra_http_headers={"Accept-Language": "vi-VN,vi;q=0.9,en;q=0.8"},
+                    )
+                    page = await context.new_page()
+                    await page.goto(url, timeout=60000, wait_until="domcontentloaded")
+                    await page.wait_for_timeout(8000)
+                    content = await page.content()
+                    await browser.close()
+                    print(f"   [Playwright] hanoimoi HTML fetched, len={len(content)}")
+                    return content
+            except Exception as e:
+                print(f"❌ Playwright hanoimoi error: {e}")
+                return ""
+
         async def fetch_one(url):
             slug = url.rstrip("/").split("/")[-1]
             category = CATEGORY_MAP.get(slug, slug.upper().replace("-", " "))
             try:
-                async with httpx.AsyncClient(timeout=20, follow_redirects=True, headers=headers) as client:
+                async with httpx.AsyncClient(timeout=20, follow_redirects=True, headers=headers, **proxy_kwargs) as client:
                     resp = await client.get(url)
                     content = resp.text
-                # Detect Cloudflare block
-                if "Chờ một chút" in content or resp.status_code != 200:
-                    print(f"⚠️ hanoimoi HTML blocked for {url} (status {resp.status_code})")
+                # Detect Cloudflare block → fallback to Playwright
+                if "Chờ một chút" in content or "cf-browser-verification" in content or resp.status_code in (403, 503):
+                    print(f"⚠️ hanoimoi blocked (status {resp.status_code}), trying Playwright...")
+                    content = await fetch_html_via_playwright(url)
+                if not content:
                     return []
                 # Parse b-grid blocks
                 result = []
