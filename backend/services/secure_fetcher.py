@@ -198,8 +198,9 @@ class SecureRSSFetcher:
                 # Use "domcontentloaded" — "networkidle" hangs on Cloudflare challenge pages
                 await page.goto(url, timeout=60000, wait_until="domcontentloaded")
                 # Wait for Cloudflare JS challenge to resolve (needs JS execution time)
-                await page.wait_for_timeout(5000)
+                await page.wait_for_timeout(10000)
                 content = await page.content()
+                print(f"   [Playwright] page title: {await page.title()!r}, content[:200]: {content[:200]!r}")
                 await browser.close()
 
                 import html as _html
