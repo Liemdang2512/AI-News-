@@ -11,6 +11,19 @@ from services.secure_fetcher import secure_fetcher
 import feedparser
 import json
 from services.fast_gemini import fast_gemini
+from services.openai_client import openai_client
+
+
+def _ai_client():
+    if settings.AI_PROVIDER == "openai":
+        return openai_client
+    return fast_gemini
+
+
+def _ai_model():
+    if settings.AI_PROVIDER == "openai":
+        return settings.OPENAI_MODEL
+    return settings.GEMINI_MODEL
 
 
 class NhanDanFetcher:
@@ -217,9 +230,9 @@ Trả về kết quả dưới dạng JSON Array, không kèm lời giải thíc
 """
 
         try:
-            response = await fast_gemini.generate_content(
+            response = await _ai_client().generate_content(
                 prompt=prompt,
-                model_name=settings.GEMINI_MODEL,
+                model_name=_ai_model(),
                 temperature=0.2,
                 max_tokens=1024,
                 api_key=api_key
@@ -286,9 +299,9 @@ Lưu ý: Chỉ trả về true nếu chắc chắn 2 bài viết về cùng sự
 """
 
         try:
-            response = await fast_gemini.generate_content(
+            response = await _ai_client().generate_content(
                 prompt=prompt,
-                model_name=settings.GEMINI_MODEL,
+                model_name=_ai_model(),
                 temperature=0.2,
                 max_tokens=256,
                 api_key=api_key

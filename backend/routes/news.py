@@ -28,9 +28,11 @@ def _resolve_api_key(header_key: Optional[str]) -> Optional[str]:
     return settings.GEMINI_API_KEY or None
 
 def _resolve_gemini_key(header_key: Optional[str]) -> Optional[str]:
-    """Luôn trả về Gemini key — dùng cho dedup/nhandan (chạy Gemini bất kể AI_PROVIDER)."""
+    """Trả về key cho dedup/nhandan theo AI_PROVIDER."""
     if header_key:
         return header_key
+    if settings.AI_PROVIDER == "openai":
+        return settings.OPENAI_API_KEY or None
     return settings.GEMINI_API_KEY or None
 
 @router.get("/models")

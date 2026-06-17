@@ -7,12 +7,25 @@ import asyncio
 from typing import List, Dict
 from config import settings
 from services.fast_gemini import fast_gemini
+from services.openai_client import openai_client
 import json
+
+
+def _ai_client():
+    if settings.AI_PROVIDER == "openai":
+        return openai_client
+    return fast_gemini
+
+
+def _ai_model():
+    if settings.AI_PROVIDER == "openai":
+        return settings.OPENAI_MODEL
+    return settings.GEMINI_MODEL
 
 
 class DedupService:
     def __init__(self):
-        self.model_name = settings.GEMINI_MODEL
+        self.model_name = settings.GEMINI_MODEL  # unused — _ai_model() used at call time
         
     async def cluster_articles_semantically(
         self, 
@@ -171,9 +184,9 @@ Lưu ý:
 """
 
         try:
-            response = await fast_gemini.generate_content(
+            response = await _ai_client().generate_content(
                 prompt=prompt,
-                model_name=self.model_name,
+                model_name=_ai_model(),
                 temperature=0.3,
                 max_tokens=2048,
                 api_key=api_key

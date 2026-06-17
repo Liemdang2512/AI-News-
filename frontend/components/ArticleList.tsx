@@ -13,13 +13,18 @@ export default function ArticleList({ articles, onSelectArticles }: ArticleListP
     const [selectedUrls, setSelectedUrls] = useState<string[]>([]);
     const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
     const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+    const [filterDuplicates, setFilterDuplicates] = useState(true);
+
+    const hasDuplicates = articles.some(a => a.is_master === false);
 
     // Group articles by category, then by duplicate group
     const groupedArticles = useMemo(() => {
         const groups: Record<string, Article[]> = {};
 
-        // Filter to show only master articles for grouping
-        const masterArticles = articles.filter(article => article.is_master !== false);
+        // When filterDuplicates is ON: show only master articles; OFF: show all
+        const masterArticles = filterDuplicates
+            ? articles.filter(article => article.is_master !== false)
+            : articles;
 
         masterArticles.forEach(article => {
             const category = article.category;
@@ -36,7 +41,7 @@ export default function ArticleList({ articles, onSelectArticles }: ArticleListP
         });
         setExpandedCategories(prev => ({ ...initialExpanded, ...prev }));
         return groups;
-    }, [articles]);
+    }, [articles, filterDuplicates]);
 
     const toggleCategory = (category: string) => {
         setExpandedCategories(prev => ({
@@ -65,11 +70,15 @@ export default function ArticleList({ articles, onSelectArticles }: ArticleListP
         );
     };
 
+    const visibleArticles = filterDuplicates
+        ? articles.filter(a => a.is_master !== false)
+        : articles;
+
     const handleSelectAll = () => {
-        if (selectedUrls.length === articles.length) {
+        if (selectedUrls.length === visibleArticles.length) {
             setSelectedUrls([]);
         } else {
-            setSelectedUrls(articles.map((a) => a.url));
+            setSelectedUrls(visibleArticles.map((a) => a.url));
         }
     };
 
@@ -107,19 +116,43 @@ export default function ArticleList({ articles, onSelectArticles }: ArticleListP
                 <h2 className="text-lg font-bold text-slate-800">
                     Danh sách bài viết
                 </h2>
+                {hasDuplicates && (
+                    <label className={`flex items-center gap-2 cursor-pointer select-none px-3 py-2 rounded-lg border transition-all ${
+                        filterDuplicates
+                            ? 'bg-amber-50 border-amber-300 text-amber-800'
+                            : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300'
+                    }`}>
+                        <input
+                            type="checkbox"
+                            checked={filterDuplicates}
+                            onChange={(e) => {
+                                setFilterDuplicates(e.target.checked);
+                                setSelectedUrls([]);
+                            }}
+                            className="w-4 h-4 text-amber-500 border-slate-300 rounded focus:ring-amber-400"
+                        />
+                        <span className="text-sm font-semibold">
+                            Lọc trùng lặp
+                        </span>
+                        <span className="text-xs font-normal opacity-70">
+                            ({articles.length} bài trước lọc)
+                        </span>
+                    </label>
+                )}
             </div>
 
             {/* Selection Actions */}
             <div className="flex items-center justify-between">
                 <p className="text-sm text-slate-600">
-                    Đã chọn <span className="font-semibold text-blue-600">{selectedUrls.length}</span> bài viết
+                    Đã chọn <span className="font-semibold text-blue-600">{selectedUrls.length}</span>
+                    {' / '}<span className="font-semibold text-slate-700">{visibleArticles.length}</span> bài viết
                 </p>
                 <div className="flex gap-3">
                     <button
                         onClick={handleSelectAll}
                         className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors"
                     >
-                        {selectedUrls.length === articles.length ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
+                        {selectedUrls.length === visibleArticles.length && visibleArticles.length > 0 ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
                     </button>
                     <button
                         onClick={handleSummarize}
