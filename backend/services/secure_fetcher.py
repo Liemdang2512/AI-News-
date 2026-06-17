@@ -6,6 +6,7 @@ Falls back to httpx if curl_cffi is not available (Render/Vercel compatibility).
 
 from typing import Dict, List, Optional
 import asyncio
+import httpx
 
 # Try to import curl_cffi, fallback to httpx if not available
 try:
@@ -13,7 +14,6 @@ try:
     CURL_CFFI_AVAILABLE = True
 except ImportError:
     print("⚠️ curl_cffi not available, falling back to httpx")
-    import httpx
     CURL_CFFI_AVAILABLE = False
 
 class SecureRSSFetcher:
@@ -71,8 +71,13 @@ class SecureRSSFetcher:
 
                     content = response.text
                     if content and len(content.strip()) > 100:
-                        return content
-                    print(f"⚠️ curl_cffi returned empty/short response for {url}, trying httpx fallback")
+                        # Verify it's actually RSS/XML, not a Cloudflare challenge or error page
+                        stripped = content.strip()
+                        if stripped.startswith('<?xml') or stripped.startswith('<rss') or stripped.startswith('<feed'):
+                            return content
+                        print(f"⚠️ curl_cffi got non-RSS response for {url} (likely Cloudflare block), trying httpx fallback")
+                    else:
+                        print(f"⚠️ curl_cffi returned empty/short response for {url}, trying httpx fallback")
             except Exception as e:
                 print(f"⚠️ curl_cffi error for {url}: {str(e)}, trying httpx fallback")
 
