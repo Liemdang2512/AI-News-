@@ -117,11 +117,21 @@ async def debug_hanoimoi():
         scraper = _cs.create_scraper()
         _r = await _asyncio.get_event_loop().run_in_executor(None, lambda: scraper.get(url, timeout=30))
         result["cloudscraper_status"] = _r.status_code
-        result["cloudscraper_len"] = len(_r.text)
         result["cloudscraper_has_bgrid"] = "b-grid" in _r.text
         result["cloudscraper_cf_block"] = "Just a moment" in _r.text or "Chờ một chút" in _r.text
     except Exception as e:
         result["cloudscraper_error"] = str(e)
+
+    # Step 3: curl_cffi (Chrome TLS fingerprint impersonation)
+    try:
+        from curl_cffi.requests import AsyncSession
+        async with AsyncSession(impersonate="chrome120") as session:
+            _r2 = await session.get(url, timeout=30, headers=headers)
+        result["curl_cffi_status"] = _r2.status_code
+        result["curl_cffi_has_bgrid"] = "b-grid" in _r2.text
+        result["curl_cffi_cf_block"] = "Just a moment" in _r2.text or "Chờ một chút" in _r2.text
+    except Exception as e:
+        result["curl_cffi_error"] = str(e)
 
     return result
 
