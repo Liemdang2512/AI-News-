@@ -88,10 +88,10 @@ class Settings:
         "https://vtv.vn/rss/phap-luat.rss",
         "https://vtv.vn/rss/the-gioi.rss",
         "https://vtv.vn/rss/kinh-te.rss",
-        "https://hanoimoi.vn/rss/xa-hoi",
-        "https://hanoimoi.vn/rss/the-gioi",
-        "https://hanoimoi.vn/rss/phap-luat",
-        "https://hanoimoi.vn/rss/kinh-te",
+        "https://hanoimoi.vn/xa-hoi",
+        "https://hanoimoi.vn/the-gioi",
+        "https://hanoimoi.vn/phap-luat",
+        "https://hanoimoi.vn/kinh-te",
         "https://www.sggp.org.vn/rss/xahoi-199.rss",
         "https://www.sggp.org.vn/rss/phapluat-112.rss",
         "https://www.sggp.org.vn/rss/kinhte-89.rss",
@@ -104,10 +104,6 @@ class Settings:
         "https://tienphong.vn/rss/kinh-te-3.rss",
         "https://tienphong.vn/rss/the-gioi-5.rss",
         "https://tienphong.vn/rss/phap-luat-12.rss",
-        "https://vov.vn/rss/the-gioi.rss",
-        "https://vov.vn/rss/kinh-te.rss",
-        "https://vov.vn/rss/xa-hoi.rss",
-        "https://vov.vn/rss/phap-luat.rss",
         "https://baotintuc.vn/the-gioi.rss",
         "https://baotintuc.vn/kinh-te.rss",
         "https://baotintuc.vn/xa-hoi.rss",
@@ -126,11 +122,11 @@ class Settings:
         "https://thanhnien.vn/rss/the-gioi.rss",
         "https://thanhnien.vn/rss/kinh-te.rss",
         "https://thanhnien.vn/rss/thoi-su/phap-luat.rss",
-        # VOV (Đài Tiếng nói Việt Nam) - vov.gov.vn
-        "https://vov.gov.vn/Rss/RssCategoryExport?categoryId=1091",  # Thời sự → XÃ HỘI
-        "https://vov.gov.vn/Rss/RssCategoryExport?categoryId=1094",  # Thế giới → THẾ GIỚI
-        "https://vov.gov.vn/Rss/RssCategoryExport?categoryId=1096",  # Kinh tế → KINH TẾ
-        "https://vov.gov.vn/Rss/RssCategoryExport?categoryId=1127",  # Pháp luật → PHÁP LUẬT
+        # VOV (Đài Tiếng nói Việt Nam) - vov.vn HTML category pages (no RSS)
+        "https://vov.vn/xa-hoi",    # Xã hội → XÃ HỘI
+        "https://vov.vn/the-gioi",  # Thế giới → THẾ GIỚI
+        "https://vov.vn/kinh-te",   # Kinh tế → KINH TẾ
+        "https://vov.vn/phap-luat", # Pháp luật → PHÁP LUẬT
     ]
 
 

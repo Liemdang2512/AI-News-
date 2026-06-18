@@ -48,7 +48,6 @@ class RSSFetcher:
         "tuoitre.vn": "TUỔI TRẺ",
         "cafef.vn": "CAFEF",
         "vov.vn": "VOV",
-        "vov.gov.vn": "VOV",
         "baotintuc.vn": "BÁO TIN TỨC",
         "thanhnien.vn": "THANH NIÊN",
     }
@@ -102,16 +101,37 @@ class RSSFetcher:
         
         all_articles = []
         
-        # Separate URLs by whether they need Secure Fetcher (anti-bot protection)
+        # Separate URLs by fetch strategy
+        hanoimoi_html_urls = []  # scrape HTML directly (RSS blocked by Cloudflare)
+        vov_html_urls = []       # scrape HTML directly (no RSS available)
         secure_urls = []
         normal_urls = []
-        
+
         for url in rss_urls:
-            # Lao Dong and Hanoi Moi need secure fetcher (anti-bot or IP blocking)
-            if 'laodong.vn' in url.lower() or 'hanoimoi.vn' in url.lower():
+            if 'hanoimoi.vn' in url.lower() and '/rss/' not in url.lower():
+                hanoimoi_html_urls.append(url)
+            elif 'vov.vn' in url.lower() and '/rss/' not in url.lower():
+                vov_html_urls.append(url)
+            elif 'laodong.vn' in url.lower():
                 secure_urls.append(url)
             else:
                 normal_urls.append(url)
+
+        # Scrape Hà Nội Mới HTML (RSS is Cloudflare-blocked)
+        if hanoimoi_html_urls:
+            print(f"🗞️ Scraping Hà Nội Mới HTML for {len(hanoimoi_html_urls)} category pages")
+            hnm_articles = await self._scrape_hanoimoi_html(
+                hanoimoi_html_urls, target_dt, start_time, end_time
+            )
+            all_articles.extend(hnm_articles)
+
+        # Scrape VOV HTML (no RSS available)
+        if vov_html_urls:
+            print(f"📻 Scraping VOV HTML for {len(vov_html_urls)} category pages")
+            vov_articles = await self._scrape_vov_html(
+                vov_html_urls, target_dt, start_time, end_time
+            )
+            all_articles.extend(vov_articles)
         
         # Fetch Secure URLs (Lao Dong with anti-bot protection)
         if secure_urls:
@@ -198,48 +218,6 @@ class RSSFetcher:
                     print(f"   ❌ {rss_url}: {str(e)}")
                     return []
 
-            async def _fetch_vov_paginated(client: httpx.AsyncClient, rss_url: str, max_pages: int = 3) -> List[Dict]:
-                """Fetch VOV RSS qua nhiều trang để bắt đúng khung giờ cần lấy."""
-                articles = []
-                for page in range(1, max_pages + 1):
-                    page_url = rss_url if page == 1 else f"{rss_url}&page={page}"
-                    try:
-                        response = await client.get(page_url)
-                        feed = feedparser.parse(response.text)
-                        if not feed.entries:
-                            print(f"   VOV page {page}: empty → stop")
-                            break
-
-                        print(f"   VOV page {page}: {len(feed.entries)} entries")
-                        all_before_target = True
-
-                        for entry in feed.entries:
-                            pub_str = entry.get("published", "")
-                            if pub_str:
-                                try:
-                                    pd = date_parser.parse(_normalize_gmt_offset(pub_str))
-                                    if pd.tzinfo:
-                                        pd = pd.astimezone(VN_TZ)
-                                    else:
-                                        from datetime import timezone as _tz
-                                        pd = pd.replace(tzinfo=_tz.utc).astimezone(VN_TZ)
-                                    if pd.date() >= target_dt.date():
-                                        all_before_target = False
-                                except Exception:
-                                    all_before_target = False
-
-                            article = self._process_entry(entry, target_dt, start_time, end_time, rss_url)
-                            if article:
-                                articles.append(article)
-
-                        if all_before_target:
-                            print(f"   VOV page {page}: tất cả bài cũ hơn ngày cần → stop")
-                            break
-                    except Exception as e:
-                        print(f"   VOV page {page} error: {str(e)}")
-                        break
-                return articles
-
             async with httpx.AsyncClient(
                 timeout=30.0,
                 follow_redirects=True,
@@ -247,10 +225,7 @@ class RSSFetcher:
             ) as client:
                 tasks = []
                 for url in normal_urls:
-                    if 'vov.gov.vn' in url:
-                        tasks.append(_fetch_vov_paginated(client, url))
-                    else:
-                        tasks.append(_fetch_one(client, url))
+                    tasks.append(_fetch_one(client, url))
                 results = await asyncio.gather(*tasks)
                 for article_list in results:
                     all_articles.extend(article_list)
@@ -275,7 +250,300 @@ class RSSFetcher:
         end_time = time(end_hour, end_min)
         
         return start_time, end_time
-    
+
+    async def _scrape_vov_html(
+        self,
+        urls: list,
+        target_dt: datetime,
+        start_time: time,
+        end_time: time,
+    ) -> list:
+        """Scrape VOV category pages (HTML) — no RSS available on vov.vn.
+
+        Strategy:
+        1. Fetch category listing page → extract article URLs, titles, thumbnails
+        2. Batch-fetch article detail pages concurrently → extract
+           `article:published_time` meta tag for accurate date/time filtering
+        3. Filter by target date + time range
+        """
+        VOV_CATEGORY_MAP = {
+            "xa-hoi": "XÃ HỘI",
+            "the-gioi": "THẾ GIỚI",
+            "kinh-te": "KINH TẾ",
+            "phap-luat": "PHÁP LUẬT",
+        }
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "vi-VN,vi;q=0.9,en;q=0.8",
+        }
+
+        import asyncio as _asyncio
+        import os as _os
+
+        cf_proxy_url = _os.environ.get("CF_PROXY_URL", "").rstrip("/")
+        if cf_proxy_url:
+            print(f"🔀 Using CF Worker proxy for VOV scrape")
+
+        def _proxy(url: str) -> str:
+            """Wrap URL with CF Worker proxy if configured."""
+            if cf_proxy_url:
+                import urllib.parse as _uparse
+                return f"{cf_proxy_url}/?url={_uparse.quote(url, safe='')}"
+            return url
+
+        async def fetch_listing(client: httpx.AsyncClient, url: str) -> list:
+            """Fetch category page, extract article cards (URL, title, thumbnail)."""
+            slug = url.rstrip("/").split("/")[-1]
+            category = VOV_CATEGORY_MAP.get(slug, slug.upper().replace("-", " "))
+            try:
+                resp = await client.get(_proxy(url))
+                if resp.status_code != 200:
+                    print(f"   ⚠️ VOV {url}: status {resp.status_code}")
+                    return []
+                content = resp.text
+                cards = []
+                # Split by article-card div starts to extract each card block
+                # Limit to first 20 cards (newest articles appear first)
+                card_starts = [m.start() for m in re.finditer(r'<div class="article-card', content)][:20]
+                for i, start in enumerate(card_starts):
+                    end = card_starts[i + 1] if i + 1 < len(card_starts) else start + 3000
+                    block = content[start:end]
+                    # Extract href (relative or absolute)
+                    link_m = re.search(r'href="(/[^"]+\.vov)"', block)
+                    if not link_m:
+                        continue
+                    article_url = "https://vov.vn" + link_m.group(1)
+
+                    # Extract title from card-title or alt attribute
+                    title_m = re.search(r'class="[^"]*card-title[^"]*"[^>]*>\s*([^<]+)', block, re.DOTALL)
+                    if not title_m:
+                        title_m = re.search(r'alt="([^"]+)"', block)
+                    title = html.unescape(title_m.group(1).strip()) if title_m else ""
+
+                    # Extract thumbnail: prefer largest srcset source, fall back to img src
+                    thumb_m = re.search(r'<img[^>]+src="([^"]+)"', block)
+                    thumbnail = thumb_m.group(1) if thumb_m else ""
+
+                    cards.append({
+                        "url": article_url,
+                        "title": title,
+                        "thumbnail": thumbnail,
+                        "category": category,
+                        "source": "VOV",
+                    })
+                print(f"   VOV listing {url}: {len(cards)} cards found")
+                return cards
+            except Exception as e:
+                print(f"❌ VOV listing error {url}: {type(e).__name__}: {e}")
+                return []
+
+        async def fetch_article_date(client: httpx.AsyncClient, article_url: str, semaphore: _asyncio.Semaphore) -> str:
+            """Fetch article detail page, return ISO 8601 published_time or empty string."""
+            async with semaphore:
+                try:
+                    resp = await client.get(_proxy(article_url))
+                    if resp.status_code != 200:
+                        return ""
+                    # Extract article:published_time meta tag
+                    m = re.search(
+                        r'<meta[^>]+property=["\']article:published_time["\'][^>]+content=["\']([^"\']+)["\']',
+                        resp.text,
+                    )
+                    if not m:
+                        # Try reversed attribute order
+                        m = re.search(
+                            r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']article:published_time["\']',
+                            resp.text,
+                        )
+                    return m.group(1) if m else ""
+                except Exception:
+                    return ""
+
+        async with httpx.AsyncClient(
+            timeout=20.0,
+            follow_redirects=True,
+            headers=headers,
+        ) as client:
+            # Step 1: fetch all category listings concurrently
+            listing_results = await _asyncio.gather(*[fetch_listing(client, u) for u in urls])
+            all_cards = []
+            for cards in listing_results:
+                all_cards.extend(cards)
+
+            if not all_cards:
+                return []
+
+            # Step 2: fetch article detail pages concurrently (max 8 at a time to avoid rate-limit)
+            semaphore = _asyncio.Semaphore(8)
+            date_strings = await _asyncio.gather(*[
+                fetch_article_date(client, card["url"], semaphore) for card in all_cards
+            ])
+
+        # Step 3: filter by date + time range
+        articles = []
+        for card, date_str in zip(all_cards, date_strings):
+            if not date_str:
+                continue
+            try:
+                pub_dt = date_parser.parse(date_str)
+                if pub_dt.tzinfo:
+                    pub_dt = pub_dt.astimezone(VN_TZ)
+                else:
+                    from datetime import timezone as _tz
+                    pub_dt = pub_dt.replace(tzinfo=_tz.utc).astimezone(VN_TZ)
+            except Exception:
+                continue
+
+            if pub_dt.date() != target_dt.date():
+                continue
+            pub_time = pub_dt.time().replace(tzinfo=None)
+            if end_time >= start_time:
+                if not (start_time <= pub_time <= end_time):
+                    continue
+            else:
+                if not (pub_time >= start_time or pub_time <= end_time):
+                    continue
+
+            articles.append({
+                **card,
+                "published_at": pub_dt.strftime("%H:%M %d/%m/%Y"),
+                "description": "",
+            })
+
+        print(f"   ✅ VOV total: {len(articles)} bài trong khung giờ")
+        return articles
+
+    async def _scrape_hanoimoi_html(
+        self,
+        urls: list,
+        target_dt: datetime,
+        start_time: time,
+        end_time: time,
+    ) -> list:
+        """Scrape Hà Nội Mới category pages (HTML) — RSS is Cloudflare-blocked."""
+        CATEGORY_MAP = {
+            "xa-hoi": "XÃ HỘI",
+            "the-gioi": "THẾ GIỚI",
+            "phap-luat": "PHÁP LUẬT",
+            "kinh-te": "KINH TẾ",
+        }
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "vi-VN,vi;q=0.9,en;q=0.8",
+        }
+        articles = []
+
+        import os
+        proxy_url = os.environ.get("WEBSHARE_PROXY_URL", "")
+        proxy_kwargs = {"proxy": proxy_url} if proxy_url else {}
+        if proxy_url:
+            print(f"🔀 Using Webshare proxy for hanoimoi scrape")
+
+        async def fetch_html_via_playwright(url: str) -> str:
+            """Dùng Playwright để vượt Cloudflare JS challenge."""
+            try:
+                from playwright.async_api import async_playwright
+            except ImportError:
+                print("⚠️ Playwright not installed")
+                return ""
+            try:
+                async with async_playwright() as pw:
+                    browser = await pw.chromium.launch(
+                        headless=True,
+                        args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage",
+                              "--disable-blink-features=AutomationControlled"],
+                    )
+                    context = await browser.new_context(
+                        user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                        locale="vi-VN",
+                        extra_http_headers={"Accept-Language": "vi-VN,vi;q=0.9,en;q=0.8"},
+                    )
+                    page = await context.new_page()
+                    await page.goto(url, timeout=60000, wait_until="domcontentloaded")
+                    await page.wait_for_timeout(8000)
+                    content = await page.content()
+                    await browser.close()
+                    print(f"   [Playwright] hanoimoi HTML fetched, len={len(content)}")
+                    return content
+            except Exception as e:
+                print(f"❌ Playwright hanoimoi error: {e}")
+                return ""
+
+        async def fetch_one(url):
+            slug = url.rstrip("/").split("/")[-1]
+            category = CATEGORY_MAP.get(slug, slug.upper().replace("-", " "))
+            try:
+                async with httpx.AsyncClient(timeout=20, follow_redirects=True, headers=headers, **proxy_kwargs) as client:
+                    resp = await client.get(url)
+                    content = resp.text
+                # Detect Cloudflare block → fallback chain: cloudscraper → Playwright
+                if "Just a moment" in content or "Chờ một chút" in content or "cf-browser-verification" in content or resp.status_code in (403, 503):
+                    print(f"⚠️ hanoimoi blocked (status {resp.status_code}), trying cloudscraper...")
+                    try:
+                        import cloudscraper as _cs
+                        import asyncio as _asyncio
+                        scraper = _cs.create_scraper()
+                        _resp = await _asyncio.get_event_loop().run_in_executor(
+                            None, lambda: scraper.get(url, timeout=30)
+                        )
+                        if _resp.status_code == 200 and "b-grid" in _resp.text:
+                            print(f"   ✅ cloudscraper bypassed CF for {url}")
+                            content = _resp.text
+                        else:
+                            print(f"   ⚠️ cloudscraper failed (status {_resp.status_code}), trying Playwright...")
+                            content = await fetch_html_via_playwright(url)
+                    except Exception as _e:
+                        print(f"   ⚠️ cloudscraper error: {_e}, trying Playwright...")
+                        content = await fetch_html_via_playwright(url)
+                if not content:
+                    return []
+                # Parse b-grid blocks
+                result = []
+                for block in re.findall(r'<div class="b-grid">(.*?)</div>\s*</div>\s*</div>', content, re.DOTALL):
+                    link_m = re.search(r'href="(https://hanoimoi\.vn/[^"]+\.html)"', block)
+                    title_m = re.search(r'b-grid__title[^>]*>.*?<a[^>]*>([^<]+)</a>', block, re.DOTALL)
+                    img_m = re.search(r'<img[^>]+src="([^"]+)"', block)
+                    date_m = re.search(r'b-grid__time">([^<]+)<', block)
+                    if not (link_m and title_m and date_m):
+                        continue
+                    # Parse date: "17/06/2026 - 11:02"
+                    try:
+                        pub_dt = datetime.strptime(date_m.group(1).strip(), "%d/%m/%Y - %H:%M")
+                        pub_dt = pub_dt.replace(tzinfo=VN_TZ)
+                    except ValueError:
+                        continue
+                    if pub_dt.date() != target_dt.date():
+                        continue
+                    pub_time = pub_dt.time().replace(tzinfo=None)
+                    if end_time >= start_time:
+                        if not (start_time <= pub_time <= end_time):
+                            continue
+                    else:
+                        if not (pub_time >= start_time or pub_time <= end_time):
+                            continue
+                    result.append({
+                        "url": link_m.group(1),
+                        "title": html.unescape(title_m.group(1).strip()),
+                        "category": category,
+                        "published_at": pub_dt.strftime("%H:%M %d/%m/%Y"),
+                        "description": "",
+                        "source": "HÀ NỘI MỚI",
+                        "thumbnail": img_m.group(1) if img_m else "",
+                    })
+                print(f"   ✅ hanoimoi {url}: {len(result)} bài")
+                return result
+            except Exception as e:
+                print(f"❌ hanoimoi scrape error {url}: {e}")
+                return []
+
+        import asyncio as _asyncio
+        results = await _asyncio.gather(*[fetch_one(u) for u in urls])
+        for r in results:
+            articles.extend(r)
+        return articles
+
     def _process_entry(
         self,
         entry: Dict,
@@ -375,22 +643,21 @@ class RSSFetcher:
         Examples:
         - https://tienphong.vn/rss/phap-luat-12.rss -> PHÁP LUẬT
         - https://laodong.vn/rss/kinh-doanh.rss -> KINH TẾ
-        - https://vov.gov.vn/Rss/RssCategoryExport?categoryId=1094 -> THẾ GIỚI
+        - https://vov.vn/xa-hoi -> XÃ HỘI
         """
         url_lower = rss_url.lower()
 
-        # vov.gov.vn uses categoryId query params
-        VOV_CATEGORY_MAP = {
-            "1091": "XÃ HỘI",   # Thời sự
-            "1094": "THẾ GIỚI",  # Thế giới
-            "1096": "KINH TẾ",   # Kinh tế
-            "1127": "PHÁP LUẬT", # Pháp luật
+        # vov.vn HTML category pages: path is the category slug
+        VOV_HTML_CATEGORY_MAP = {
+            "xa-hoi": "XÃ HỘI",
+            "the-gioi": "THẾ GIỚI",
+            "kinh-te": "KINH TẾ",
+            "phap-luat": "PHÁP LUẬT",
         }
-        if "vov.gov.vn" in url_lower:
-            import re as _re
-            m = _re.search(r"categoryid=(\d+)", url_lower)
-            if m and m.group(1) in VOV_CATEGORY_MAP:
-                return VOV_CATEGORY_MAP[m.group(1)]
+        if "vov.vn" in url_lower and "/rss/" not in url_lower:
+            slug = url_lower.rstrip("/").split("/")[-1]
+            if slug in VOV_HTML_CATEGORY_MAP:
+                return VOV_HTML_CATEGORY_MAP[slug]
 
         # Category mapping from URL keywords
         if any(keyword in url_lower for keyword in ['phap-luat', 'phapluat', 'phap_luat']):

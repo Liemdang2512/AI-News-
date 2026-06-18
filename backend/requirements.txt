@@ -12,3 +12,6 @@ lxml>=4.9.0
 lxml_html_clean>=0.1.0
 asyncpg
 pytest
+playwright>=1.40.0
+cloudscraper>=1.2.71
+cloakbrowser>=0.3.31
