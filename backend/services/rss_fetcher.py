@@ -279,13 +279,22 @@ class RSSFetcher:
         }
 
         import asyncio as _asyncio
+        import os as _os
+
+        cf_proxy_url = _os.environ.get("CF_PROXY_URL", "").rstrip("/")
+        if cf_proxy_url:
+            print(f"🔀 Using CF Worker proxy for VOV scrape")
+
+        def _proxy(url: str) -> str:
+            """Wrap URL with CF Worker proxy if configured."""
+            return f"{cf_proxy_url}/?url={url}" if cf_proxy_url else url
 
         async def fetch_listing(client: httpx.AsyncClient, url: str) -> list:
             """Fetch category page, extract article cards (URL, title, thumbnail)."""
             slug = url.rstrip("/").split("/")[-1]
             category = VOV_CATEGORY_MAP.get(slug, slug.upper().replace("-", " "))
             try:
-                resp = await client.get(url)
+                resp = await client.get(_proxy(url))
                 if resp.status_code != 200:
                     print(f"   ⚠️ VOV {url}: status {resp.status_code}")
                     return []
@@ -330,7 +339,7 @@ class RSSFetcher:
             """Fetch article detail page, return ISO 8601 published_time or empty string."""
             async with semaphore:
                 try:
-                    resp = await client.get(article_url)
+                    resp = await client.get(_proxy(article_url))
                     if resp.status_code != 200:
                         return ""
                     # Extract article:published_time meta tag
