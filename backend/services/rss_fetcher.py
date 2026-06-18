@@ -103,6 +103,7 @@ class RSSFetcher:
         
         # Separate URLs by fetch strategy
         hanoimoi_html_urls = []  # scrape HTML directly (legacy — only used if non-/rss/ URL is passed)
+        hanoimoi_rss_urls = []   # hanoimoi RSS — use CF proxy to bypass datacenter IP block
         vov_html_urls = []       # scrape HTML directly (no RSS available)
         secure_urls = []
         normal_urls = []
@@ -110,10 +111,11 @@ class RSSFetcher:
         for url in rss_urls:
             if 'hanoimoi.vn' in url.lower() and '/rss/' not in url.lower():
                 hanoimoi_html_urls.append(url)
+            elif 'hanoimoi.vn' in url.lower() and '/rss/' in url.lower():
+                hanoimoi_rss_urls.append(url)
             elif 'vov.vn' in url.lower() and '/rss/' not in url.lower():
                 vov_html_urls.append(url)
-            elif 'laodong.vn' in url.lower() or ('hanoimoi.vn' in url.lower() and '/rss/' in url.lower()):
-                # hanoimoi RSS uses double-escaped CDATA → needs raw XML parsing (same path as laodong secure fetcher)
+            elif 'laodong.vn' in url.lower():
                 secure_urls.append(url)
             else:
                 normal_urls.append(url)
@@ -125,6 +127,74 @@ class RSSFetcher:
                 hanoimoi_html_urls, target_dt, start_time, end_time
             )
             all_articles.extend(hnm_articles)
+
+        # Fetch Hà Nội Mới RSS (via CF Worker proxy to bypass Cloudflare datacenter IP block)
+        if hanoimoi_rss_urls:
+            import os as _os2, urllib.parse as _uparse2
+            cf_proxy = _os2.environ.get("CF_PROXY_URL", "").rstrip("/")
+            if cf_proxy:
+                print(f"🔀 Fetching Hà Nội Mới RSS via CF proxy ({len(hanoimoi_rss_urls)} feeds)")
+            else:
+                print(f"📰 Fetching Hà Nội Mới RSS directly ({len(hanoimoi_rss_urls)} feeds, no CF proxy set)")
+
+            _hnm_headers = {
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "application/rss+xml, application/xml, text/xml, */*",
+                "Accept-Language": "vi-VN,vi;q=0.9,en;q=0.8",
+            }
+
+            async def _fetch_hnm_rss(rss_url: str) -> tuple:
+                fetch_url = f"{cf_proxy}/?url={_uparse2.quote(rss_url, safe='')}" if cf_proxy else rss_url
+                try:
+                    async with httpx.AsyncClient(timeout=20, follow_redirects=True, headers=_hnm_headers) as c:
+                        resp = await c.get(fetch_url)
+                        content = resp.text
+                        stripped = content.strip()
+                        if stripped.startswith("<?xml") or stripped.startswith("<rss"):
+                            return rss_url, content
+                        print(f"   ⚠️ hanoimoi RSS non-XML response for {rss_url} (status {resp.status_code})")
+                except Exception as e:
+                    print(f"   ❌ hanoimoi RSS fetch error {rss_url}: {e}")
+                # Fallback: secure_fetcher (curl_cffi + rss2json + playwright chain)
+                content = await secure_fetcher.fetch_rss(rss_url)
+                return rss_url, content
+
+            hnm_rss_results = await asyncio.gather(*[_fetch_hnm_rss(u) for u in hanoimoi_rss_urls])
+
+            for rss_url, content in hnm_rss_results:
+                if not content:
+                    print(f"   ❌ hanoimoi RSS {rss_url}: No content")
+                    continue
+                feed = feedparser.parse(content)
+                print(f"   ✅ hanoimoi RSS {rss_url}: {len(feed.entries)} entries")
+
+                # Extract thumbnail + description from double-escaped CDATA
+                hanoimoi_extras: dict = {}
+                for item_xml in re.findall(r'<item>(.*?)</item>', content, re.DOTALL):
+                    link_m = re.search(r'<link>([^<]+)</link>', item_xml)
+                    if not link_m:
+                        continue
+                    item_url = link_m.group(1).strip()
+                    cdata_m = re.search(r'&lt;!\[CDATA\[(.*?)\]\]&gt;', item_xml, re.DOTALL)
+                    if cdata_m:
+                        inner = html.unescape(cdata_m.group(1))
+                        img_m = re.search(r'<img[^>]+src=["\']([^"\']+)["\']', inner)
+                        text = re.sub(r'<[^>]+>', ' ', inner).strip()
+                        text = re.sub(r'\s+', ' ', text)
+                        hanoimoi_extras[item_url] = {
+                            'thumbnail': img_m.group(1) if img_m else '',
+                            'description': text,
+                        }
+
+                for entry in feed.entries:
+                    article = self._process_entry(entry, target_dt, start_time, end_time, rss_url)
+                    if article:
+                        extras = hanoimoi_extras.get(article['url'], {})
+                        if extras.get('thumbnail'):
+                            article['thumbnail'] = extras['thumbnail']
+                        if extras.get('description') and not article['description']:
+                            article['description'] = extras['description']
+                        all_articles.append(article)
 
         # Scrape VOV HTML (no RSS available)
         if vov_html_urls:
