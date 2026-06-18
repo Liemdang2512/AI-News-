@@ -128,14 +128,14 @@ class RSSFetcher:
             )
             all_articles.extend(hnm_articles)
 
-        # Fetch Hà Nội Mới RSS (via CF Worker proxy to bypass Cloudflare datacenter IP block)
+        # Fetch Hà Nội Mới RSS (Cloudflare blocks datacenter IPs — use residential proxy or Playwright)
         if hanoimoi_rss_urls:
             import os as _os2, urllib.parse as _uparse2
-            cf_proxy = _os2.environ.get("CF_PROXY_URL", "").rstrip("/")
-            if cf_proxy:
-                print(f"🔀 Fetching Hà Nội Mới RSS via CF proxy ({len(hanoimoi_rss_urls)} feeds)")
+            webshare_proxy = _os2.environ.get("WEBSHARE_PROXY_URL", "").strip()
+            if webshare_proxy:
+                print(f"🔀 Fetching Hà Nội Mới RSS via residential proxy ({len(hanoimoi_rss_urls)} feeds)")
             else:
-                print(f"📰 Fetching Hà Nội Mới RSS directly ({len(hanoimoi_rss_urls)} feeds, no CF proxy set)")
+                print(f"📰 Fetching Hà Nội Mới RSS via Playwright fallback ({len(hanoimoi_rss_urls)} feeds, no proxy set)")
 
             _hnm_headers = {
                 "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -144,18 +144,22 @@ class RSSFetcher:
             }
 
             async def _fetch_hnm_rss(rss_url: str) -> tuple:
-                fetch_url = f"{cf_proxy}/?url={_uparse2.quote(rss_url, safe='')}" if cf_proxy else rss_url
-                try:
-                    async with httpx.AsyncClient(timeout=20, follow_redirects=True, headers=_hnm_headers) as c:
-                        resp = await c.get(fetch_url)
-                        content = resp.text
-                        stripped = content.strip()
-                        if stripped.startswith("<?xml") or stripped.startswith("<rss"):
-                            return rss_url, content
-                        print(f"   ⚠️ hanoimoi RSS non-XML response for {rss_url} (status {resp.status_code})")
-                except Exception as e:
-                    print(f"   ❌ hanoimoi RSS fetch error {rss_url}: {e}")
-                # Fallback: secure_fetcher (curl_cffi + rss2json + playwright chain)
+                # Try residential proxy first (bypasses Cloudflare IP block)
+                if webshare_proxy:
+                    try:
+                        async with httpx.AsyncClient(
+                            timeout=20, follow_redirects=True, headers=_hnm_headers,
+                            proxy=webshare_proxy
+                        ) as c:
+                            resp = await c.get(rss_url)
+                            content = resp.text
+                            stripped = content.strip()
+                            if stripped.startswith("<?xml") or stripped.startswith("<rss"):
+                                return rss_url, content
+                            print(f"   ⚠️ hanoimoi RSS non-XML via proxy for {rss_url} (status {resp.status_code})")
+                    except Exception as e:
+                        print(f"   ❌ hanoimoi RSS proxy error {rss_url}: {e}")
+                # Fallback: secure_fetcher (curl_cffi → rss2json → Playwright)
                 content = await secure_fetcher.fetch_rss(rss_url)
                 return rss_url, content
 
