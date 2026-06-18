@@ -102,7 +102,7 @@ class RSSFetcher:
         all_articles = []
         
         # Separate URLs by fetch strategy
-        hanoimoi_html_urls = []  # scrape HTML directly (RSS blocked by Cloudflare)
+        hanoimoi_html_urls = []  # scrape HTML directly (legacy — only used if non-/rss/ URL is passed)
         vov_html_urls = []       # scrape HTML directly (no RSS available)
         secure_urls = []
         normal_urls = []
@@ -112,12 +112,13 @@ class RSSFetcher:
                 hanoimoi_html_urls.append(url)
             elif 'vov.vn' in url.lower() and '/rss/' not in url.lower():
                 vov_html_urls.append(url)
-            elif 'laodong.vn' in url.lower():
+            elif 'laodong.vn' in url.lower() or ('hanoimoi.vn' in url.lower() and '/rss/' in url.lower()):
+                # hanoimoi RSS uses double-escaped CDATA → needs raw XML parsing (same path as laodong secure fetcher)
                 secure_urls.append(url)
             else:
                 normal_urls.append(url)
 
-        # Scrape Hà Nội Mới HTML (RSS is Cloudflare-blocked)
+        # Scrape Hà Nội Mới HTML (legacy path — hanoimoi now has RSS at /rss/<category>)
         if hanoimoi_html_urls:
             print(f"🗞️ Scraping Hà Nội Mới HTML for {len(hanoimoi_html_urls)} category pages")
             hnm_articles = await self._scrape_hanoimoi_html(
