@@ -16,6 +16,14 @@ const BROWSER_HEADERS = {
   'Upgrade-Insecure-Requests': '1',
 };
 
+const RSS_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  'Accept': 'application/rss+xml, application/xml, text/xml, */*;q=0.8',
+  'Accept-Language': 'vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7',
+  'Accept-Encoding': 'gzip, deflate, br',
+  'Connection': 'keep-alive',
+};
+
 export default {
   async fetch(request) {
     const url = new URL(request.url);
@@ -36,6 +44,10 @@ export default {
     if (!allowed) {
       return new Response('Host not allowed', { status: 403 });
     }
+
+    // Use RSS headers for RSS feed URLs, browser headers otherwise
+    const isRss = target.includes('/rss/') || target.endsWith('.rss') || target.endsWith('.xml');
+    const baseHeaders = isRss ? RSS_HEADERS : BROWSER_HEADERS;
 
     try {
       // Cookie jar: accumulate Set-Cookie headers across all redirect hops
@@ -59,7 +71,7 @@ export default {
       }
 
       async function fetchWithCookies(url) {
-        const headers = { ...BROWSER_HEADERS };
+        const headers = { ...baseHeaders };
         const jar = cookieString();
         if (jar) headers['Cookie'] = jar;
         const resp = await fetch(url, { headers, redirect: 'manual', cf: { cacheTtl: 0 } });
@@ -83,17 +95,18 @@ export default {
       }
 
       let content = await response.text();
-      const contentType = response.headers.get('Content-Type') || 'text/html; charset=utf-8';
+      const contentType = response.headers.get('Content-Type') || (isRss ? 'application/xml; charset=utf-8' : 'text/html; charset=utf-8');
 
-      // Step 3: follow JS redirect (vov.vn window.location.href với jskey) — same cookie jar
-      if (response.status === 200 && content.length < 5000) {
+      // Step 3: follow JS redirect for HTML pages only (vov.vn window.location.href với jskey)
+      // Skip for RSS feeds — they don't have JS redirects and short content is valid XML
+      if (!isRss && response.status === 200 && content.length < 5000) {
         const jsRedirect = content.match(/window\.location\.href\s*=\s*["']([^"']+)["']/);
         if (jsRedirect) {
           const jsUrl = new URL(jsRedirect[1], target).href;
           const jsHost = new URL(jsUrl).hostname;
           if (ALLOWED_HOSTS.some(h => jsHost.endsWith(h))) {
             // Follow JS redirect with accumulated cookies, allow HTTP redirects after
-            const headers = { ...BROWSER_HEADERS };
+            const headers = { ...baseHeaders };
             const jar = cookieString();
             if (jar) headers['Cookie'] = jar;
             const jsResponse = await fetch(jsUrl, { headers, cf: { cacheTtl: 300 } });
@@ -109,6 +122,7 @@ export default {
           'Access-Control-Allow-Origin': '*',
           'Cache-Control': 'public, max-age=300',
           'X-Proxy-Status': `${response.status}`,
+          'X-Proxy-Mode': isRss ? 'rss' : 'html',
         },
       });
     } catch (err) {
