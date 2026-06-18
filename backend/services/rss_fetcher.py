@@ -357,8 +357,11 @@ class RSSFetcher:
         import os as _os
 
         cf_proxy_url = _os.environ.get("CF_PROXY_URL", "").rstrip("/")
+        webshare_proxy_url = _os.environ.get("WEBSHARE_PROXY_URL", "").strip()
         if cf_proxy_url:
             print(f"🔀 Using CF Worker proxy for VOV scrape")
+        elif webshare_proxy_url:
+            print(f"🔀 Using Webshare residential proxy for VOV scrape")
 
         def _proxy(url: str) -> str:
             """Wrap URL with CF Worker proxy if configured."""
@@ -435,10 +438,16 @@ class RSSFetcher:
                 except Exception:
                     return ""
 
+        # Use residential proxy when CF Worker proxy is not configured (Railway datacenter IPs get 403)
+        _proxy_kwargs = {}
+        if not cf_proxy_url and webshare_proxy_url:
+            _proxy_kwargs["proxy"] = webshare_proxy_url
+
         async with httpx.AsyncClient(
             timeout=20.0,
             follow_redirects=True,
             headers=headers,
+            **_proxy_kwargs,
         ) as client:
             # Step 1: fetch all category listings concurrently
             listing_results = await _asyncio.gather(*[fetch_listing(client, u) for u in urls])
