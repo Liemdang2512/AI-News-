@@ -287,7 +287,10 @@ class RSSFetcher:
 
         def _proxy(url: str) -> str:
             """Wrap URL with CF Worker proxy if configured."""
-            return f"{cf_proxy_url}/?url={url}" if cf_proxy_url else url
+            if cf_proxy_url:
+                import urllib.parse as _uparse
+                return f"{cf_proxy_url}/?url={_uparse.quote(url, safe='')}"
+            return url
 
         async def fetch_listing(client: httpx.AsyncClient, url: str) -> list:
             """Fetch category page, extract article cards (URL, title, thumbnail)."""
@@ -332,7 +335,7 @@ class RSSFetcher:
                 print(f"   VOV listing {url}: {len(cards)} cards found")
                 return cards
             except Exception as e:
-                print(f"❌ VOV listing error {url}: {e}")
+                print(f"❌ VOV listing error {url}: {type(e).__name__}: {e}")
                 return []
 
         async def fetch_article_date(client: httpx.AsyncClient, article_url: str, semaphore: _asyncio.Semaphore) -> str:
