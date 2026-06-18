@@ -161,8 +161,17 @@ class RSSFetcher:
                             if resp.status_code == 200:
                                 solution = resp.json().get("solution", {})
                                 content = solution.get("response", "")
+                                # Chrome browser wraps XML in HTML viewer — extract raw XML
+                                import html as _html_mod
+                                for marker in ["<?xml", "<rss", "<feed"]:
+                                    idx = content.find(marker)
+                                    if idx >= 0:
+                                        content = content[idx:]
+                                        if "&lt;" in content:
+                                            content = _html_mod.unescape(content)
+                                        break
                                 stripped = content.strip()
-                                if stripped.startswith("<?xml") or stripped.startswith("<rss"):
+                                if stripped.startswith("<?xml") or stripped.startswith("<rss") or stripped.startswith("<feed"):
                                     print(f"   ✅ FlareSolverr: hanoimoi RSS OK {rss_url}")
                                     return rss_url, content
                                 print(f"   ⚠️ FlareSolverr non-XML for {rss_url}, trying next layer")
