@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const isElectron = process.env.NEXT_OUTPUT === 'export'
-const BACKEND_URL = process.env.BACKEND_URL || 'https://ai-news-production-7cfe.up.railway.app'
+const BACKEND_URL = process.env.BACKEND_URL || 'https://ai-news-backend-production-6e96.up.railway.app'
 
 const nextConfig = {
     reactStrictMode: true,
