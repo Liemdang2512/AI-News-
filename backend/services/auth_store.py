@@ -78,6 +78,7 @@ async def _ensure_store_initialized() -> None:
         await ensure_tables()
         try:
             await seed_admin_if_missing(settings.ADMIN_EMAIL, settings.ADMIN_PASSWORD_HASH)
+            await _seed_user_if_missing(settings.USER_EMAIL, settings.USER_PASSWORD_HASH)
         except Exception:
             # Never crash app flow due to auth bootstrap issues.
             pass
@@ -170,6 +171,29 @@ async def ensure_tables() -> None:
     await pool.execute(
         f"CREATE INDEX IF NOT EXISTS idx_{SESSION_TABLE_NAME}_user_id ON {SESSION_TABLE_NAME}(user_id);"
     )
+
+
+async def _seed_user_if_missing(email: str, password_hash: str) -> None:
+    """Bootstrap a regular (non-admin) user from env vars."""
+    email = (email or "").strip().lower()
+    password_hash = (password_hash or "").strip()
+    if not email or not password_hash:
+        return
+    global _mem_user_id_seq
+    async with _mem_lock:
+        if email in _mem_users_by_email:
+            return
+        uid = _mem_user_id_seq
+        _mem_user_id_seq += 1
+        row = _UserRow(
+            id=uid,
+            email=email,
+            password_hash=password_hash,
+            is_admin=False,
+            created_at=_now_utc(),
+        )
+        _mem_users_by_email[email] = row
+        _mem_users_by_id[uid] = row
 
 
 async def seed_admin_if_missing(admin_email: str, admin_password_hash: str) -> None:

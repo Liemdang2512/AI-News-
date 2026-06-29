@@ -61,6 +61,9 @@ class Settings:
     ADMIN_EMAIL: str = os.getenv("ADMIN_EMAIL", "")
     # Expected to already be a hashed password (seeded from CI/.env).
     ADMIN_PASSWORD_HASH: str = os.getenv("ADMIN_PASSWORD_HASH", "")
+    # Optional: bootstrap a single regular (non-admin) user from env vars.
+    USER_EMAIL: str = os.getenv("USER_EMAIL", "")
+    USER_PASSWORD_HASH: str = os.getenv("USER_PASSWORD_HASH", "")
 
     # Choose storage backend for session/user auth.
     # - "memory": in-process store (good for tests/dev)
