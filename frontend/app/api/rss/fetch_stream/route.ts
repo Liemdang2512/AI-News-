@@ -3,7 +3,7 @@ export const runtime = 'edge';
 const BACKEND_URL = process.env.BACKEND_URL || (
     process.env.VERCEL_ENV === 'preview'
         ? 'https://ai-news-backend-staging.up.railway.app'
-        : 'https://ai-news-production-f9a1.up.railway.app'
+        : 'https://ai-news-rosy.vercel.app'
 );
 
 export async function POST(request: Request) {
