@@ -219,100 +219,161 @@ export default function Home() {
         }
     };
 
+    // Merge multiple markdown summaries (from chunked calls) into one
+    const mergeSummaries = (summaries: string[]): string => {
+        if (summaries.length === 0) return '';
+        if (summaries.length === 1) return summaries[0];
+
+        const categoryOrder = ['KINH TẾ', 'TÀI CHÍNH', 'XÃ HỘI', 'PHÁP LUẬT', 'THẾ GIỚI', 'KHÁC'];
+        const allSections: Record<string, string[]> = {};
+
+        for (const summary of summaries) {
+            const lines = summary.split('\n');
+            let currentCat = '';
+            let currentLines: string[] = [];
+
+            for (const line of lines) {
+                if (line.startsWith('## ')) {
+                    if (currentCat && currentLines.join('').trim()) {
+                        if (!allSections[currentCat]) allSections[currentCat] = [];
+                        allSections[currentCat].push(currentLines.join('\n').trim());
+                    }
+                    currentCat = line.slice(3).trim();
+                    currentLines = [];
+                } else if (line.startsWith('# ') || line.startsWith('---') || line.startsWith('*Tóm tắt')) {
+                    // skip header/footer
+                } else if (currentCat) {
+                    currentLines.push(line);
+                }
+            }
+            if (currentCat && currentLines.join('').trim()) {
+                if (!allSections[currentCat]) allSections[currentCat] = [];
+                allSections[currentCat].push(currentLines.join('\n').trim());
+            }
+        }
+
+        const today = new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        let result = `# TIN TỨC TỔNG HỢP (${today})\n\n`;
+
+        const orderedCats = [
+            ...categoryOrder.filter(c => allSections[c]),
+            ...Object.keys(allSections).filter(c => !categoryOrder.includes(c) && allSections[c])
+        ];
+
+        for (const cat of orderedCats) {
+            result += `## ${cat}\n\n`;
+            result += allSections[cat].join('\n\n') + '\n\n';
+        }
+
+        result += `---\n*Tóm tắt được tạo tự động bởi AI.*`;
+        return result.trim();
+    };
+
     const handleSummarize = async (urls: string[]) => {
+        const CHUNK_SIZE = 12; // safe within Vercel Hobby 60s limit
+
         setLoading(true);
         setError('');
         setSummary('');
-        setCurrentProgressStep(3); // Step 3: Generating summary
+        setCurrentProgressStep(3);
 
-        // Reset progress
-        setProgressData({
-            completed: 0,
-            total: urls.length,
-            currentArticle: 'Đang khởi tạo...',
-            status: 'processing'
-        });
-
-        // Determined selected articles
         const selectedArticles = articles.filter(article => urls.includes(article.url));
-        // Update metadata with selected count
         if (searchMetadata) {
             setSearchMetadata({ ...searchMetadata, totalArticles: selectedArticles.length });
         }
 
+        // Split into chunks
+        const chunks: string[][] = [];
+        for (let i = 0; i < urls.length; i += CHUNK_SIZE) {
+            chunks.push(urls.slice(i, i + CHUNK_SIZE));
+        }
+
+        const totalArticles = urls.length;
+        let globalCompleted = 0;
+
+        setProgressData({
+            completed: 0,
+            total: totalArticles,
+            currentArticle: 'Đang khởi tạo...',
+            status: 'processing'
+        });
+
+        const partialSummaries: string[] = [];
+
         try {
             setCurrentStep('Đang tóm tắt bài viết...');
 
-            setCurrentStep('Đang tóm tắt bài viết...');
+            for (let chunkIdx = 0; chunkIdx < chunks.length; chunkIdx++) {
+                const chunkUrls = chunks[chunkIdx];
+                const chunkArticles = selectedArticles.filter(a => chunkUrls.includes(a.url));
 
-            // Use streaming fetch instead of WebSocket (better for Vercel)
-            const response = await fetch(`${API_BASE_URL}/api/articles/summarize_stream`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/x-ndjson'
-                },
-                credentials: 'include',
-                body: JSON.stringify({
-                    urls,
-                    articles: selectedArticles
-                })
-            });
+                const response = await fetch(`${API_BASE_URL}/api/articles/summarize_stream`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/x-ndjson'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({ urls: chunkUrls, articles: chunkArticles })
+                });
 
-            // Handle stream
-            const reader = response.body?.getReader();
-            if (!reader) throw new Error('Không thể đọc stream từ server');
+                if (!response.ok) throw new Error(`Lỗi server (lô ${chunkIdx + 1}/${chunks.length})`);
 
-            const decoder = new TextDecoder();
-            let buffer = '';
+                const reader = response.body?.getReader();
+                if (!reader) throw new Error('Không thể đọc stream từ server');
 
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
+                const decoder = new TextDecoder();
+                let buffer = '';
+                const chunkBaseCompleted = globalCompleted;
 
-                buffer += decoder.decode(value, { stream: true });
-                const lines = buffer.split('\n');
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
 
-                // Process all complete lines
-                buffer = lines.pop() || ''; // Keep the last incomplete line in buffer
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
 
-                for (const line of lines) {
-                    if (!line.trim()) continue;
-                    try {
-                        const data = JSON.parse(line);
-
-                        if (data.type === 'progress') {
-                            setProgressData({
-                                completed: data.completed,
-                                total: data.total,
-                                currentArticle: data.current_article,
-                                status: data.status
-                            });
-                        } else if (data.type === 'complete') {
-                            setSummary(data.summary);
-                            setCurrentProgressStep(4);
-                            setLoading(false);
-                            setCurrentStep('');
-                        } else if (data.type === 'error') {
-                            throw new Error(data.message);
+                    for (const line of lines) {
+                        if (!line.trim()) continue;
+                        try {
+                            const data = JSON.parse(line);
+                            if (data.type === 'progress') {
+                                setProgressData({
+                                    completed: chunkBaseCompleted + data.completed,
+                                    total: totalArticles,
+                                    currentArticle: data.current_article,
+                                    status: 'processing'
+                                });
+                            } else if (data.type === 'complete') {
+                                partialSummaries.push(data.summary);
+                                globalCompleted = chunkBaseCompleted + chunkUrls.length;
+                            } else if (data.type === 'error') {
+                                throw new Error(data.message);
+                            }
+                        } catch (e) {
+                            console.error('Error parsing stream line:', line, e);
                         }
-                    } catch (e) {
-                        console.error('Error parsing stream line:', line, e);
                     }
+                }
+
+                // Check remaining buffer
+                if (buffer.trim()) {
+                    try {
+                        const data = JSON.parse(buffer);
+                        if (data.type === 'complete') {
+                            partialSummaries.push(data.summary);
+                            globalCompleted = chunkBaseCompleted + chunkUrls.length;
+                        }
+                    } catch (_) {}
                 }
             }
 
-            // Final check on buffer
-            if (buffer.trim()) {
-                try {
-                    const data = JSON.parse(buffer);
-                    if (data.type === 'complete') {
-                        setSummary(data.summary);
-                        setCurrentProgressStep(4);
-                        setLoading(false);
-                    }
-                } catch (e) { }
-            }
+            const finalSummary = mergeSummaries(partialSummaries);
+            setSummary(finalSummary);
+            setCurrentProgressStep(4);
+            setLoading(false);
+            setCurrentStep('');
 
         } catch (err) {
             console.error('Summarize error:', err);
