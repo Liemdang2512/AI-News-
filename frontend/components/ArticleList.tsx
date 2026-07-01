@@ -9,6 +9,8 @@ interface ArticleListProps {
     onSelectArticles: (urls: string[]) => void;
 }
 
+const MAX_ARTICLES = 20;
+
 export default function ArticleList({ articles, onSelectArticles }: ArticleListProps) {
     const [selectedUrls, setSelectedUrls] = useState<string[]>([]);
     const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
@@ -65,9 +67,11 @@ export default function ArticleList({ articles, onSelectArticles }: ArticleListP
     };
 
     const handleToggle = (url: string) => {
-        setSelectedUrls((prev) =>
-            prev.includes(url) ? prev.filter((u) => u !== url) : [...prev, url]
-        );
+        setSelectedUrls((prev) => {
+            if (prev.includes(url)) return prev.filter((u) => u !== url);
+            if (prev.length >= MAX_ARTICLES) return prev;
+            return [...prev, url];
+        });
     };
 
     const visibleArticles = filterDuplicates
@@ -75,10 +79,10 @@ export default function ArticleList({ articles, onSelectArticles }: ArticleListP
         : articles;
 
     const handleSelectAll = () => {
-        if (selectedUrls.length === visibleArticles.length) {
+        if (selectedUrls.length === visibleArticles.length || selectedUrls.length >= MAX_ARTICLES) {
             setSelectedUrls([]);
         } else {
-            setSelectedUrls(visibleArticles.map((a) => a.url));
+            setSelectedUrls(visibleArticles.slice(0, MAX_ARTICLES).map((a) => a.url));
         }
     };
 
@@ -143,10 +147,16 @@ export default function ArticleList({ articles, onSelectArticles }: ArticleListP
 
             {/* Selection Actions */}
             <div className="flex items-center justify-between">
-                <p className="text-sm text-slate-600">
-                    Đã chọn <span className="font-semibold text-blue-600">{selectedUrls.length}</span>
-                    {' / '}<span className="font-semibold text-slate-700">{visibleArticles.length}</span> bài viết
-                </p>
+                <div>
+                    <p className="text-sm text-slate-600">
+                        Đã chọn <span className={`font-semibold ${selectedUrls.length >= MAX_ARTICLES ? 'text-amber-600' : 'text-blue-600'}`}>{selectedUrls.length}</span>
+                        {' / '}<span className="font-semibold text-slate-700">{visibleArticles.length}</span> bài viết
+                        <span className="ml-2 text-xs text-slate-400">(tối đa {MAX_ARTICLES} bài/lần)</span>
+                    </p>
+                    {selectedUrls.length >= MAX_ARTICLES && (
+                        <p className="text-xs text-amber-600 mt-1">Đã đạt giới hạn {MAX_ARTICLES} bài. Bỏ chọn bài khác để thêm.</p>
+                    )}
+                </div>
                 <div className="flex gap-3">
                     <button
                         onClick={handleSelectAll}

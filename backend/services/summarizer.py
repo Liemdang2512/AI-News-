@@ -286,7 +286,18 @@ class Summarizer:
                      "status": "processing"
                  }
             
-            batch_results = await asyncio.gather(*batch_tasks)
+            # Wrap each task with a hard timeout so one slow article can't block the batch
+            timed_tasks = [asyncio.wait_for(t, timeout=120) for t in batch_tasks]
+            raw_results = await asyncio.gather(*timed_tasks, return_exceptions=True)
+            batch_results = []
+            for idx, r in enumerate(raw_results):
+                if isinstance(r, (asyncio.TimeoutError, Exception)):
+                    url_f = batch_urls[idx] if idx < len(batch_urls) else ""
+                    meta_f = articles_metadata.get(url_f.strip().rstrip('/')) or articles_metadata.get(url_f) or {}
+                    title_f = meta_f.get('title', url_f)
+                    batch_results.append({"error": f"Timeout xử lý bài: {title_f}"})
+                else:
+                    batch_results.append(r)
             all_results.extend(batch_results)
             completed += len(batch_results)
             
