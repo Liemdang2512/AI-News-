@@ -1,10 +1,6 @@
 export const runtime = 'edge';
 
-const BACKEND_URL = process.env.BACKEND_URL || (
-    process.env.VERCEL_ENV === 'preview'
-        ? 'https://ai-news-backend-staging.up.railway.app'
-        : 'https://api-news.meetingminutes.ai.vn'
-);
+const BACKEND_URL = 'https://api-news.meetingminutes.ai.vn';
 
 export async function POST(request: Request) {
     const body = await request.text();
