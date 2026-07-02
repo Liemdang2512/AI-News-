@@ -1,0 +1,20 @@
+{
+  "project_name": "App crwal - AI News Aggregator",
+  "stack": "nextjs + fastapi + python",
+  "milestone": "bug-fixes-and-new-sources",
+  "task": "vps-backend-deploy",
+  "status": "done",
+  "blockers": [],
+  "changed_files": [
+    "backend/services/summarizer.py",
+    "backend/vercel.json",
+    "vercel.json",
+    "frontend/components/ArticleList.tsx",
+    "frontend/app/page.tsx"
+  ],
+  "next_action": "Xóa BACKEND_URL env var trong Vercel dashboard. Project stable.",
+  "session_count": 27,
+  "created_at": "2026-06-17",
+  "last_session_at": "2026-07-02",
+  "updated_at": "2026-07-02T18:15"
+}
