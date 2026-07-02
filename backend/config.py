@@ -125,11 +125,11 @@ class Settings:
         "https://thanhnien.vn/rss/the-gioi.rss",
         "https://thanhnien.vn/rss/kinh-te.rss",
         "https://thanhnien.vn/rss/thoi-su/phap-luat.rss",
-        # VOV (Đài Tiếng nói Việt Nam) - vov.vn HTML category pages (no RSS)
-        "https://vov.vn/xa-hoi",    # Xã hội → XÃ HỘI
-        "https://vov.vn/the-gioi",  # Thế giới → THẾ GIỚI
-        "https://vov.vn/kinh-te",   # Kinh tế → KINH TẾ
-        "https://vov.vn/phap-luat", # Pháp luật → PHÁP LUẬT
+        # VOV (Đài Tiếng nói Việt Nam) - RSS feeds
+        "https://vov.vn/rss/xa-hoi.rss",
+        "https://vov.vn/rss/the-gioi.rss",
+        "https://vov.vn/rss/kinh-te.rss",
+        "https://vov.vn/rss/phap-luat.rss",
     ]
 
 

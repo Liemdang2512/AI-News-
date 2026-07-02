@@ -115,7 +115,7 @@ class RSSFetcher:
                 hanoimoi_rss_urls.append(url)
             elif 'vov.vn' in url.lower() and '/rss/' not in url.lower():
                 vov_html_urls.append(url)
-            elif 'laodong.vn' in url.lower():
+            elif 'laodong.vn' in url.lower() or 'vov.vn' in url.lower():
                 secure_urls.append(url)
             else:
                 normal_urls.append(url)
@@ -128,87 +128,11 @@ class RSSFetcher:
             )
             all_articles.extend(hnm_articles)
 
-        # Fetch Hà Nội Mới RSS (Cloudflare Managed Challenge — FlareSolverr → CF Worker → residential → secure_fetcher)
+        # Fetch Hà Nội Mới RSS via Playwright (secure_fetcher)
         if hanoimoi_rss_urls:
-            import os as _os2, urllib.parse as _uparse2
-            flaresolverr_url = _os2.environ.get("FLARESOLVERR_URL", "").rstrip("/")
-            cf_proxy = _os2.environ.get("CF_PROXY_URL", "").rstrip("/")
-            webshare_proxy = _os2.environ.get("WEBSHARE_PROXY_URL", "").strip()
-            if flaresolverr_url:
-                print(f"🔥 Fetching Hà Nội Mới RSS via FlareSolverr ({len(hanoimoi_rss_urls)} feeds)")
-            elif cf_proxy:
-                print(f"🔀 Fetching Hà Nội Mới RSS via CF Worker proxy ({len(hanoimoi_rss_urls)} feeds)")
-            elif webshare_proxy:
-                print(f"🔀 Fetching Hà Nội Mới RSS via residential proxy ({len(hanoimoi_rss_urls)} feeds)")
-            else:
-                print(f"📰 Fetching Hà Nội Mới RSS via secure_fetcher fallback ({len(hanoimoi_rss_urls)} feeds)")
-
-            _hnm_headers = {
-                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                "Accept": "application/rss+xml, application/xml, text/xml, */*",
-                "Accept-Language": "vi-VN,vi;q=0.9,en;q=0.8",
-            }
+            print(f"📰 Fetching Hà Nội Mới RSS via Playwright ({len(hanoimoi_rss_urls)} feeds)")
 
             async def _fetch_hnm_rss(rss_url: str) -> tuple:
-                # Layer 1: FlareSolverr — giải CF Managed Challenge bằng Chrome thật
-                if flaresolverr_url:
-                    try:
-                        async with httpx.AsyncClient(timeout=60) as c:
-                            resp = await c.post(
-                                f"{flaresolverr_url}/v1",
-                                json={"cmd": "request.get", "url": rss_url, "maxTimeout": 45000},
-                            )
-                            if resp.status_code == 200:
-                                solution = resp.json().get("solution", {})
-                                content = solution.get("response", "")
-                                # Chrome browser wraps XML in HTML viewer — extract raw XML
-                                import html as _html_mod
-                                for marker in ["<?xml", "<rss", "<feed"]:
-                                    idx = content.find(marker)
-                                    if idx >= 0:
-                                        content = content[idx:]
-                                        if "&lt;" in content:
-                                            content = _html_mod.unescape(content)
-                                        break
-                                stripped = content.strip()
-                                if stripped.startswith("<?xml") or stripped.startswith("<rss") or stripped.startswith("<feed"):
-                                    print(f"   ✅ FlareSolverr: hanoimoi RSS OK {rss_url}")
-                                    return rss_url, content
-                                print(f"   ⚠️ FlareSolverr non-XML for {rss_url}, trying next layer")
-                            else:
-                                print(f"   ⚠️ FlareSolverr HTTP {resp.status_code} for {rss_url}, trying next layer")
-                    except Exception as e:
-                        print(f"   ❌ FlareSolverr error {rss_url}: {e}, trying next layer")
-                # Layer 2: CF Worker proxy
-                if cf_proxy:
-                    try:
-                        proxied = f"{cf_proxy}/?url={_uparse2.quote(rss_url, safe='')}"
-                        async with httpx.AsyncClient(timeout=20, follow_redirects=True, headers=_hnm_headers) as c:
-                            resp = await c.get(proxied)
-                            content = resp.text
-                            stripped = content.strip()
-                            if stripped.startswith("<?xml") or stripped.startswith("<rss"):
-                                print(f"   ✅ CF Worker: hanoimoi RSS OK {rss_url}")
-                                return rss_url, content
-                            print(f"   ⚠️ CF Worker non-XML for {rss_url} (status {resp.status_code}), trying next layer")
-                    except Exception as e:
-                        print(f"   ❌ CF Worker error {rss_url}: {e}, trying next layer")
-                # Layer 3: Residential proxy
-                if webshare_proxy:
-                    try:
-                        async with httpx.AsyncClient(
-                            timeout=20, follow_redirects=True, headers=_hnm_headers,
-                            proxy=webshare_proxy
-                        ) as c:
-                            resp = await c.get(rss_url)
-                            content = resp.text
-                            stripped = content.strip()
-                            if stripped.startswith("<?xml") or stripped.startswith("<rss"):
-                                return rss_url, content
-                            print(f"   ⚠️ hanoimoi RSS non-XML via proxy for {rss_url} (status {resp.status_code})")
-                    except Exception as e:
-                        print(f"   ❌ hanoimoi RSS proxy error {rss_url}: {e}")
-                # Layer 4+: secure_fetcher (curl_cffi → rss2json → ScrapingAnt → Playwright)
                 content = await secure_fetcher.fetch_rss(rss_url)
                 return rss_url, content
 
@@ -569,31 +493,10 @@ class RSSFetcher:
         articles = []
 
         import os
-        flaresolverr = os.environ.get("FLARESOLVERR_URL", "").rstrip("/")
         proxy_url = os.environ.get("WEBSHARE_PROXY_URL", "")
         proxy_kwargs = {"proxy": proxy_url} if proxy_url else {}
-        if flaresolverr:
-            print(f"🔥 Using FlareSolverr for hanoimoi HTML scrape")
-        elif proxy_url:
+        if proxy_url:
             print(f"🔀 Using Webshare proxy for hanoimoi scrape")
-
-        async def fetch_html_via_flaresolverr(url: str) -> str:
-            """Dùng FlareSolverr để vượt CF Managed Challenge."""
-            try:
-                async with httpx.AsyncClient(timeout=60) as c:
-                    resp = await c.post(
-                        f"{flaresolverr}/v1",
-                        json={"cmd": "request.get", "url": url, "maxTimeout": 45000},
-                    )
-                    if resp.status_code == 200:
-                        content = resp.json().get("solution", {}).get("response", "")
-                        if content:
-                            print(f"   ✅ FlareSolverr HTML OK {url}, len={len(content)}")
-                            return content
-                    print(f"   ⚠️ FlareSolverr HTML failed for {url} (HTTP {resp.status_code})")
-            except Exception as e:
-                print(f"   ❌ FlareSolverr HTML error {url}: {e}")
-            return ""
 
         async def fetch_html_via_playwright(url: str) -> str:
             """Dùng Playwright để vượt Cloudflare JS challenge."""
@@ -629,16 +532,10 @@ class RSSFetcher:
             slug = url.rstrip("/").split("/")[-1]
             category = CATEGORY_MAP.get(slug, slug.upper().replace("-", " "))
             try:
-                # Layer 1: FlareSolverr (nếu có) — bỏ qua httpx direct khi biết sẽ bị CF block
-                if flaresolverr:
-                    content = await fetch_html_via_flaresolverr(url)
-                    if not content:
-                        content = await fetch_html_via_playwright(url)
-                else:
-                    async with httpx.AsyncClient(timeout=20, follow_redirects=True, headers=headers, **proxy_kwargs) as client:
-                        resp = await client.get(url)
-                        content = resp.text
-                    # Detect Cloudflare block → fallback chain: cloudscraper → Playwright
+                async with httpx.AsyncClient(timeout=20, follow_redirects=True, headers=headers, **proxy_kwargs) as client:
+                    resp = await client.get(url)
+                    content = resp.text
+                # Detect Cloudflare block → fallback chain: cloudscraper → Playwright
                     if "Just a moment" in content or "Chờ một chút" in content or "cf-browser-verification" in content or resp.status_code in (403, 503):
                         print(f"⚠️ hanoimoi blocked (status {resp.status_code}), trying cloudscraper...")
                         try:
