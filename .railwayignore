@@ -1,0 +1,17 @@
+# Dockerfile chỉ cần backend/requirements.txt + backend/ — mọi thứ còn lại bỏ ra
+.git
+.harness
+Users
+@
+frontend
+desktop
+cloudflare-worker
+docs
+node_modules
+
+# Không đẩy secret / môi trường local / log lên
+.env
+**/.env
+**/venv
+**/__pycache__
+*.log

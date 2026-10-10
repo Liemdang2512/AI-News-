@@ -84,7 +84,7 @@ export default function Home() {
         }
     };
 
-    const handleSearch = async (data: { newspapers: string; date: string; timeRange: string }) => {
+    const handleSearch = async (data: { newspapers: string; date: string; timeRange: string }, isRetry = false) => {
         setLoading(true);
         setError('');
         setArticles([]);
@@ -98,6 +98,8 @@ export default function Home() {
             { id: 'dedup', label: 'Phân tích trùng lặp', status: 'pending', message: '' },
             { id: 'verification', label: 'Xác thực Báo Nhân Dân', status: 'pending', message: '' },
         ]);
+
+        let articlesReceived = false;
 
         try {
             setCurrentStep('Đang khớp nguồn RSS...');
@@ -137,7 +139,6 @@ export default function Home() {
             }
 
             let buffer = ''; // Buffer for incomplete chunks
-            let articlesReceived = false;
 
             while (true) {
                 const { done, value } = await reader.read();
@@ -211,6 +212,17 @@ export default function Home() {
             setCurrentStep('');
 
         } catch (err) {
+            // Connection dropped after results already arrived: keep them, no error banner.
+            if (articlesReceived) {
+                console.warn('Stream closed after articles were received, ignoring:', err);
+                setLoading(false);
+                setCurrentStep('');
+                return;
+            }
+            if (!isRetry) {
+                console.warn('Search stream failed, retrying once:', err);
+                return handleSearch(data, true);
+            }
             console.error('Search error:', err);
             setError(err instanceof Error ? err.message : 'Đã xảy ra lỗi không xác định');
             setLoading(false);
