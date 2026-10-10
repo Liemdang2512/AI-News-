@@ -179,6 +179,19 @@ async def _seed_user_if_missing(email: str, password_hash: str) -> None:
     password_hash = (password_hash or "").strip()
     if not email or not password_hash:
         return
+
+    # Postgres mode: login/session lookups read the DB, so seed there (RAM-only seed is invisible to them).
+    if _storage_mode() == "postgres":
+        pool = await _get_pool()
+        if pool is not None:
+            await pool.execute(
+                f"INSERT INTO {USER_TABLE_NAME} (email, password_hash, is_admin) "
+                "VALUES ($1, $2, FALSE) ON CONFLICT (email) DO NOTHING",
+                email,
+                password_hash,
+            )
+            return
+
     global _mem_user_id_seq
     async with _mem_lock:
         if email in _mem_users_by_email:
