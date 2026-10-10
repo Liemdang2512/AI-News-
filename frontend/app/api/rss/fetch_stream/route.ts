@@ -1,6 +1,6 @@
 export const runtime = 'edge';
 
-const BACKEND_URL = 'https://api-news.meetingminutes.ai.vn';
+const BACKEND_URL = 'https://backend-production-96b2.up.railway.app';
 
 export async function POST(request: Request) {
     const body = await request.text();
