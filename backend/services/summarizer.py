@@ -143,10 +143,13 @@ class Summarizer:
         definite_signals = (
             "checking your browser",
             "cf-browser-verification",
-            "captcha",
             "enable javascript and cookies to continue",
         )
         if any(sig in low for sig in definite_signals):
+            return True
+        # "captcha" chỉ tính với trang ngắn: bài đầy đủ (tuoitre) có form bình luận chứa captcha,
+        # còn trang chặn captcha thật thì ngắn (< 20KB)
+        if "captcha" in low and len(low) < 20000:
             return True
         # Cookie challenge — phải có CẢ HAI signal cùng lúc mới là trang chặn
         # (tránh false-positive: nhiều trang hợp lệ có document.cookie trong tracking JS)
