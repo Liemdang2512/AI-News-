@@ -11,7 +11,7 @@ except ImportError:
     _TRAFILATURA_AVAILABLE = False
 import httpx
 from config import settings
-from services.secure_fetcher import secure_fetcher
+from services.secure_fetcher import secure_fetcher, CURL_CFFI_AVAILABLE
 from services.rss_fetcher import rss_fetcher
 from services.gemini_client import gemini_client
 from prompts import SINGLE_ARTICLE_SUMMARIZE_PROMPT, SINGLE_ARTICLE_URL_SUMMARIZE_PROMPT
@@ -165,32 +165,71 @@ class Summarizer:
             return False
         return bool(re.search(r'^- .{20,}', summary, re.MULTILINE))
 
-    async def _fetch_article_html(self, url: str, timeout: int = 25) -> str:
+    async def _fetch_article_html(self, url: str, timeout: int = 15) -> str:
         """
-        Fetch nội dung HTML bài báo bằng nhiều cơ chế.
-        Dùng curl_cffi trước, sau đó fallback httpx.
+        Fetch HTML bài báo trực tiếp (không qua chuỗi fetch RSS).
+        Thứ tự: curl_cffi (impersonate + cookie challenge) -> httpx (cookie challenge)
+        -> Playwright raw HTML (last resort, cap 45s).
+        Worst case ~ 15 + 15 + 45 = 75s, chừa chỗ cho Gemini trong wait_for(120).
         """
-        # 1) Secure fetcher / curl_cffi (tốt cho site anti-bot)
-        try:
-            html = await secure_fetcher.fetch_rss(url, timeout=timeout)
-            if html and len(html.strip()) > 200 and not self._looks_like_block_page(html):
-                return html
-        except Exception:
-            pass
+        async def _get(client) -> str:
+            resp = await client.get(url)
+            text = resp.text or ""
+            # Cookie challenge (Lao Dong): document.cookie="KEY=VALUE"+...; window.location.reload
+            if "document.cookie" in text and "window.location.reload" in text:
+                m = re.search(r'document\.cookie="([^"]+)"', text)
+                if m and "=" in m.group(1):
+                    key, value = m.group(1).split("=", 1)
+                    client.cookies.set(key, value)
+                    print(f"🔄 Cookie challenge for {url}. Retry with cookie {key}={value[:10]}...")
+                    resp = await client.get(url)
+                    text = resp.text or ""
+            return text
 
-        # 2) Fallback httpx
+        def _ok(html: str) -> bool:
+            return bool(html) and len(html.strip()) > 200 and not self._looks_like_block_page(html)
+
+        # 1) curl_cffi (tốt cho site anti-bot)
+        if CURL_CFFI_AVAILABLE:
+            try:
+                from curl_cffi.requests import AsyncSession
+                async with AsyncSession(
+                    impersonate=secure_fetcher.impersonate,
+                    headers=secure_fetcher.headers,
+                    timeout=timeout,
+                ) as session:
+                    html = await _get(session)
+                if _ok(html):
+                    return html
+                print(f"⚠️ curl_cffi got block/short page for {url}, trying httpx")
+            except Exception as e:
+                print(f"⚠️ curl_cffi error for {url}: {e}, trying httpx")
+
+        # 2) httpx
         try:
             async with httpx.AsyncClient(
                 timeout=timeout,
                 follow_redirects=True,
                 headers=self._HTTP_HEADERS,
             ) as client:
-                resp = await client.get(url)
-                html = resp.text or ""
-                if html and len(html.strip()) > 200 and not self._looks_like_block_page(html):
-                    return html
-        except Exception:
-            pass
+                html = await _get(client)
+            if _ok(html):
+                return html
+            print(f"⚠️ httpx got block/short page for {url}, trying Playwright")
+        except Exception as e:
+            print(f"⚠️ httpx error for {url}: {e}, trying Playwright")
+
+        # 3) Playwright raw HTML — last resort, cap 45s
+        try:
+            html = await asyncio.wait_for(
+                secure_fetcher._fetch_via_playwright(url, timeout, raw_html=True),
+                timeout=45,
+            )
+            if _ok(html):
+                return html
+            print(f"⚠️ Playwright got block/short page for {url}")
+        except Exception as e:
+            print(f"⚠️ Playwright error/timeout for {url}: {e!r}")
 
         return ""
 
@@ -416,30 +455,16 @@ class Summarizer:
                 # Bước 1: Fetch trang + gửi nội dung cho AI
                 print(f"   🔄 Fetch thủ công: {url[:50]}")
                 content: Optional[str] = None
-                best_merged = ""
 
-                for attempt in range(3):
-                    try:
-                        raw_html = await self._fetch_article_html(url)
-                        if not raw_html or len(raw_html.strip()) < 80:
-                            if attempt < 2:
-                                await asyncio.sleep(2 * (attempt + 1))
-                            continue
-                        page_extracted = self._extract_content(raw_html, limit=15000)
-                        merged = self._merge_page_and_feed(page_extracted, rss_plain, event_plain)
-                        if len(merged) > len(best_merged):
-                            best_merged = merged
-                        if len(merged.strip()) >= self._MIN_CHARS_TO_SUMMARIZE:
-                            content = merged
-                            break
-                        if attempt < 2:
-                            await asyncio.sleep(2 * (attempt + 1))
-                    except Exception as e:
-                        print(f"   ❌ Fetch error attempt {attempt+1}: {e}")
-                        await asyncio.sleep(2 * (attempt + 1))
-
-                if not content and best_merged:
-                    content = best_merged
+                # Các lớp curl_cffi -> httpx -> Playwright trong _fetch_article_html đã là retry
+                try:
+                    raw_html = await self._fetch_article_html(url)
+                    if raw_html and len(raw_html.strip()) >= 80:
+                        content = self._merge_page_and_feed(
+                            self._extract_content(raw_html, limit=15000), rss_plain, event_plain
+                        )
+                except Exception as e:
+                    print(f"   ❌ Fetch error: {e}")
 
                 # Nếu fetch thất bại, dùng title + RSS description làm content
                 if not content or len(content.strip()) < self._MIN_CHARS_TO_SUMMARIZE:
