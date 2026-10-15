@@ -176,8 +176,11 @@ class SecureRSSFetcher:
             print(f"❌ ScrapingAnt error for {url}: {e}")
         return ""
 
-    async def _fetch_via_playwright(self, url: str, timeout: int = 30) -> str:
-        """Fetch RSS via headless Chromium (Playwright). Bypasses Cloudflare JS challenge."""
+    async def _fetch_via_playwright(self, url: str, timeout: int = 30, raw_html: bool = False) -> str:
+        """Fetch RSS via headless Chromium (Playwright). Bypasses Cloudflare JS challenge.
+
+        raw_html=True returns the page's raw HTML without RSS filtering (used for article pages).
+        """
         try:
             from playwright.async_api import async_playwright
         except ImportError:
@@ -189,19 +192,25 @@ class SecureRSSFetcher:
                     headless=True,
                     args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
                 )
-                context = await browser.new_context(
-                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                    locale="vi-VN",
-                    extra_http_headers={"Accept-Language": "vi-VN,vi;q=0.9,en;q=0.8"},
-                )
-                page = await context.new_page()
-                # Use "domcontentloaded" — "networkidle" hangs on Cloudflare challenge pages
-                await page.goto(url, timeout=60000, wait_until="domcontentloaded")
-                # Wait for Cloudflare JS challenge to resolve (needs JS execution time)
-                await page.wait_for_timeout(10000)
-                content = await page.content()
-                print(f"   [Playwright] page title: {await page.title()!r}, content[:200]: {content[:200]!r}")
-                await browser.close()
+                # finally đảm bảo đóng Chromium cả khi lỗi / bị wait_for cancel
+                try:
+                    context = await browser.new_context(
+                        user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                        locale="vi-VN",
+                        extra_http_headers={"Accept-Language": "vi-VN,vi;q=0.9,en;q=0.8"},
+                    )
+                    page = await context.new_page()
+                    # Use "domcontentloaded" — "networkidle" hangs on Cloudflare challenge pages
+                    await page.goto(url, timeout=60000, wait_until="domcontentloaded")
+                    # Wait for Cloudflare JS challenge to resolve (needs JS execution time)
+                    await page.wait_for_timeout(10000)
+                    content = await page.content()
+                    print(f"   [Playwright] page title: {await page.title()!r}, content[:200]: {content[:200]!r}")
+                finally:
+                    await browser.close()
+
+                if raw_html:
+                    return content
 
                 import html as _html
                 # Browser wraps XML in HTML - extract raw XML
