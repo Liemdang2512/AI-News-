@@ -1,0 +1,48 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: app-crwal-backend
+    restart: unless-stopped
+    init: true # dọn process Chromium zombie
+    shm_size: "1gb" # Chromium crash nếu /dev/shm quá nhỏ
+    env_file:
+      - path: .env
+        format: raw # giữ nguyên dấu $ trong hash mật khẩu, không để compose thay biến
+    environment:
+      BACKEND_PORT: "8080"
+      AUTH_SESSION_STORAGE: postgres
+      AUTH_DB_DSN: postgresql://app_crwal:${POSTGRES_PASSWORD}@postgres:5432/app_crwal
+    ports:
+      - "127.0.0.1:8080:8080" # chỉ nginx trên host gọi vào
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: app-crwal-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: app_crwal
+      POSTGRES_USER: app_crwal
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    # Không publish cổng 5432: chỉ backend trong mạng compose truy cập được
+    volumes:
+      - app_crwal_pgdata:/var/lib/postgresql/data
+      - ./backend/db/init.sql:/docker-entrypoint-initdb.d/00-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app_crwal -d app_crwal"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  app_crwal_pgdata:

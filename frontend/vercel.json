@@ -6,7 +6,7 @@
     "rewrites": [
         {
             "source": "/api/:path*",
-            "destination": "https://backend-production-96b2.up.railway.app/api/:path*"
+            "destination": "https://api-news.meetingminutes.ai.vn/api/:path*"
         }
     ]
 }
